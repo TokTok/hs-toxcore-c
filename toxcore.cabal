@@ -13,7 +13,7 @@ category:             Network
 
 source-repository head
   type: git
-  location: https://github.com/TokTok/libtox-haskell
+  location: https://github.com/TokTok/hs-toxcore
 
 library
   default-language: Haskell2010
