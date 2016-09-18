@@ -51,6 +51,8 @@ test-suite testsuite
   build-depends:
       base < 5
     , QuickCheck >= 2.9.1
+    , base16-bytestring
+    , bytestring
     , data-default-class
     , hspec
     , saltine
