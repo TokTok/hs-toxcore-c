@@ -81,25 +81,24 @@
 --
 module Network.Tox.C.Tox where
 
-import           Control.Applicative             ((<$>), (<*>))
-import           Control.Exception               (bracket)
-import qualified Crypto.Saltine.Class            as Sodium (encode)
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as BS
-import           Data.Default.Class              (Default (..))
-import           Data.Word                       (Word16, Word32, Word64)
-import           Foreign.C.String                (CString, peekCString,
-                                                  withCString)
-import           Foreign.C.Types                 (CInt (..), CSize (..))
-import           Foreign.Ptr                     (FunPtr, Ptr, nullPtr)
-import           GHC.Generics                    (Generic)
-import           Test.QuickCheck.Arbitrary       (Arbitrary (..),
-                                                  arbitraryBoundedEnum,
-                                                  genericShrink)
+import           Control.Applicative       ((<$>), (<*>))
+import           Control.Exception         (bracket)
+import qualified Crypto.Saltine.Class      as Sodium (encode)
+import           Crypto.Saltine.Core.Box   (CombinedKey, Nonce, PublicKey,
+                                            SecretKey)
+import           Data.ByteString           (ByteString)
+import qualified Data.ByteString           as BS
+import           Data.ByteString.Arbitrary (fromABS)
+import           Data.Default.Class        (Default (..))
+import           Data.Word                 (Word16, Word32, Word64)
+import           Foreign.C.String          (CString, peekCString, withCString)
+import           Foreign.C.Types           (CInt (..), CSize (..))
+import           Foreign.Ptr               (FunPtr, Ptr, nullPtr)
+import           GHC.Generics              (Generic)
+import           Test.QuickCheck.Arbitrary (Arbitrary (..),
+                                            arbitraryBoundedEnum)
 
 import           Network.Tox.C.CEnum
-import qualified Network.Tox.Crypto.Key          as Key
-import           Network.Tox.NodeInfo.PortNumber (PortNumber)
 
 -- | The Tox instance type. All the state associated with a connection is held
 -- within the instance. Multiple instances can exist and operate concurrently.
@@ -351,11 +350,9 @@ instance Arbitrary Options where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> arbitrary
+    <*> (fromABS <$> arbitrary)
     where
       arbitraryCString = filter (/= '\NUL') <$> arbitrary
-
-  shrink = genericShrink
 
 
 data OptionsStruct
@@ -682,13 +679,13 @@ foreign import ccall tox_bootstrap :: Tox a -> CString -> Word16 -> CString -> C
 
 callBootstrapFun
   :: (Tox a -> CString -> Word16 -> CString -> CErr ErrBootstrap -> IO ())
-  -> Tox a -> String -> PortNumber -> Key.PublicKey -> IO (Either ErrBootstrap ())
+  -> Tox a -> String -> Word16 -> PublicKey -> IO (Either ErrBootstrap ())
 callBootstrapFun f tox address port pubKey =
   withCString address $ \address' ->
     BS.useAsCString (Sodium.encode pubKey) $ \pubKey' ->
       callErrFun $ f tox address' (fromIntegral port) pubKey'
 
-toxBootstrap :: Tox a -> String -> PortNumber -> Key.PublicKey -> IO (Either ErrBootstrap ())
+toxBootstrap :: Tox a -> String -> Word16 -> PublicKey -> IO (Either ErrBootstrap ())
 toxBootstrap = callBootstrapFun tox_bootstrap
 
 
@@ -705,7 +702,7 @@ toxBootstrap = callBootstrapFun tox_bootstrap
 -- @return true on success.
 foreign import ccall tox_add_tcp_relay :: Tox a -> CString -> Word16 -> CString -> CErr ErrBootstrap -> IO ()
 
-toxAddTcpRelay :: Tox a -> String -> PortNumber -> Key.PublicKey -> IO (Either ErrBootstrap ())
+toxAddTcpRelay :: Tox a -> String -> Word16 -> PublicKey -> IO (Either ErrBootstrap ())
 toxAddTcpRelay = callBootstrapFun tox_add_tcp_relay
 
 

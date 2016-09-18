@@ -1,14 +1,16 @@
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.ToxSpec where
 
-import qualified Crypto.Saltine.Core.Box as Sodium
-import           Data.Default.Class      (def)
-import           Data.Proxy              (Proxy (..))
+import qualified Crypto.Saltine.Core.Box           as Sodium
+import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxBeforeNM,
+                                                              boxNonce, boxPK,
+                                                              boxSK)
+import           Data.Default.Class                (def)
+import           Data.Proxy                        (Proxy (..))
 import           Test.Hspec
 import           Test.QuickCheck
 
-import qualified Network.Tox.C           as C
-import qualified Network.Tox.Crypto.Key  as Key
+import qualified Network.Tox.C                     as C
 
 
 spec :: Spec
@@ -23,8 +25,8 @@ spec = do
 
   describe "key size" $
     it "is equal to the hstox expected key size" $ do
-      fromIntegral C.tox_public_key_size `shouldBe` Key.encodedByteSize (Proxy :: Proxy Sodium.PublicKey)
-      fromIntegral C.tox_secret_key_size `shouldBe` Key.encodedByteSize (Proxy :: Proxy Sodium.SecretKey)
+      fromIntegral C.tox_public_key_size `shouldBe` Sodium.boxPK
+      fromIntegral C.tox_secret_key_size `shouldBe` Sodium.boxSK
       C.tox_address_size `shouldBe` C.tox_public_key_size + 6
       C.tox_max_name_length `shouldBe` 128
       C.tox_max_status_message_length `shouldBe` 1007

@@ -1,6 +1,6 @@
 name:                 toxcore
-synopsis:             C bindings to the C reference implementation of Tox
-version:              0.1.0
+synopsis:             Haskell bindings to the C reference implementation of Tox
+version:              0.0.2
 cabal-version:        >= 1.10
 license:              AGPL-3
 license-file:         LICENSE.md
@@ -10,6 +10,10 @@ maintainer:           iphy
 copyright:            © 2016 iphy
 homepage:             https://toktok.github.io
 category:             Network
+description:
+  Haskell bindings to the C reference implementation of Tox.
+  .
+  See <https://github.com/TokTok/toxcore>.
 
 source-repository head
   type: git
@@ -25,10 +29,10 @@ library
   extra-libraries: toxcore
   build-depends:
       base < 5
-    , QuickCheck
+    , QuickCheck >= 2.9.1
     , bytestring
+    , bytestring-arbitrary
     , data-default-class
-    , hstox
     , saltine
   exposed-modules:
       Network.Tox.C
@@ -46,10 +50,9 @@ test-suite testsuite
       -fno-warn-unused-imports
   build-depends:
       base < 5
-    , QuickCheck
+    , QuickCheck >= 2.9.1
     , data-default-class
     , hspec
-    , hstox
     , saltine
     , toxcore
   main-is: testsuite.hs
