@@ -7,6 +7,8 @@ cache:
     - $HOME/.ghc
 
 install:
+  - cabal install happy
+  - cabal install hpc-coveralls "aeson < 0.11"
   # Where to find libraries.
   - export LD_LIBRARY_PATH=$HOME/.ghc/usr/lib
   - export PKG_CONFIG_PATH=$HOME/.ghc/usr/lib/pkgconfig
@@ -16,4 +18,14 @@ install:
   # c-toxcore
   - git clone --depth=1 https://github.com/TokTok/toxcore
   - (cd toxcore && cmake -B_build -H. -DCMAKE_INSTALL_PREFIX:PATH=$HOME/.ghc/usr && make -C_build install -j$(nproc))
-  - cabal install --only-dependencies --enable-tests --extra-include-dirs=$HOME/.ghc/usr/include --extra-lib-dirs=$HOME/.ghc/usr/lib
+  - cabal install --only-dependencies --enable-tests --enable-benchmarks --extra-include-dirs=$HOME/.ghc/usr/include --extra-lib-dirs=$HOME/.ghc/usr/lib
+
+script:
+  - cabal configure --enable-tests --enable-benchmarks --enable-library-coverage
+  - cabal build
+  - cabal test
+
+after_script:
+  - TESTSUITE=toxcore-0.0.2
+  - cp dist/hpc/mix/testsuite/*.mix dist/hpc/mix/$TESTSUITE/
+  - hpc-coveralls $TESTSUITE
