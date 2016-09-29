@@ -1,10 +1,10 @@
 module Network.Tox.C.Callbacks where
 
-import           Control.Exception (bracket)
-import           Foreign.Ptr       (FunPtr, freeHaskellFunPtr, nullFunPtr)
+import           Control.Exception  (bracket)
+import           Foreign.Ptr        (freeHaskellFunPtr, nullFunPtr)
 
-import           Network.Tox.C.Tox (Tox)
-import qualified Network.Tox.C.Tox as Tox
+import qualified Network.Tox.C.Tox  as Tox
+import           Network.Tox.C.Type (Tox)
 
 
 -- | Low level event handler. The functions in this class are directly

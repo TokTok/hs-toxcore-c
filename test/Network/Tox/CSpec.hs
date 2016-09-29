@@ -54,6 +54,10 @@ getRight (Left  l) = fail $ show l
 getRight (Right r) = return r
 
 
+must :: Show a => IO (Either a b) -> IO b
+must = (getRight =<<)
+
+
 newtype UserData = UserData Int
   deriving (Eq, Storable)
 
@@ -67,12 +71,10 @@ spec :: Spec
 spec =
   describe "toxcore" $
     it "can bootstrap" $
-      (getRight =<<) $ C.withOptions options $ \optPtr ->
-        (getRight =<<) $ C.withTox optPtr $ \tox -> do
-          getRight =<< C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
-          getRight =<< C.toxAddTcpRelay tox bootstrapHost 33445 bootstrapKey
-
-          print =<< C.tox_self_get_nospam tox
+      must $ C.withOptions options $ \optPtr ->
+        must $ C.withTox optPtr $ \tox -> do
+          must $ C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
+          must $ C.toxAddTcpRelay tox bootstrapHost 33445 bootstrapKey
 
           C.withHandler tox $
             with (UserData 1234) $ \userData ->

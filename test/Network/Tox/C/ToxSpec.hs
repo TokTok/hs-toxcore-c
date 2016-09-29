@@ -1,16 +1,28 @@
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.ToxSpec where
 
+import           Control.Applicative               ((<$>))
+import qualified Crypto.Saltine.Class              as Sodium
 import qualified Crypto.Saltine.Core.Box           as Sodium
 import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxBeforeNM,
                                                               boxNonce, boxPK,
                                                               boxSK)
+import qualified Data.ByteString                   as BS
 import           Data.Default.Class                (def)
 import           Data.Proxy                        (Proxy (..))
 import           Test.Hspec
 import           Test.QuickCheck
 
 import qualified Network.Tox.C                     as C
+
+
+getRight :: (Monad m, Show a) => Either a b -> m b
+getRight (Left  l) = fail $ show l
+getRight (Right r) = return r
+
+
+must :: Show a => IO (Either a b) -> IO b
+must = (getRight =<<)
 
 
 spec :: Spec
@@ -23,8 +35,8 @@ spec = do
         C.tox_version_patch
       `shouldBe` True
 
-  describe "key size" $
-    it "is equal to the hstox expected key size" $ do
+  describe "Constants" $
+    it "has constants equal to the hstox expected key size" $ do
       fromIntegral C.tox_public_key_size `shouldBe` Sodium.boxPK
       fromIntegral C.tox_secret_key_size `shouldBe` Sodium.boxSK
       C.tox_address_size `shouldBe` C.tox_public_key_size + 6
@@ -49,7 +61,27 @@ spec = do
           C.peekToxOptions ptr
         res `shouldBe` Right options0
 
-    describe "def" $
-      it "is equivalent to the C default options" $ do
-        res <- C.withToxOptions C.peekToxOptions
-        res `shouldBe` Right def
+    it "has a 'def' that is equivalent to the C default options" $ do
+      res <- C.withToxOptions C.peekToxOptions
+      res `shouldBe` Right def
+
+  describe "nospam" $
+    it "can be retrieved after being set" $
+      property $ \nospam ->
+        must $ C.withDefaultTox $ \tox -> do
+          C.tox_self_set_nospam tox nospam
+          nospam' <- C.tox_self_get_nospam tox
+          nospam' `shouldBe` nospam
+
+  describe "public key" $ do
+    it "is a prefix of the address" $
+      must $ C.withDefaultTox $ \tox -> do
+        pk <- Sodium.encode <$> C.toxSelfGetPublicKey tox
+        addr <- C.toxSelfGetAddress tox
+        BS.unpack addr `shouldStartWith` BS.unpack pk
+
+    it "is not equal to the secret key" $
+      must $ C.withDefaultTox $ \tox -> do
+        pk <- Sodium.encode <$> C.toxSelfGetPublicKey tox
+        sk <- Sodium.encode <$> C.toxSelfGetSecretKey tox
+        pk `shouldNotBe` sk
