@@ -1,7 +1,9 @@
 {-# LANGUAGE Safe #-}
 module Network.Tox.C.Type where
 
-import           Foreign.Ptr (Ptr)
+import           Control.Concurrent.MVar (MVar)
+import           Foreign.Ptr             (Ptr)
+import           Foreign.StablePtr       (StablePtr)
 
 
 -- | The Tox instance type. All the state associated with a connection is held
@@ -11,3 +13,5 @@ import           Foreign.Ptr (Ptr)
 -- limiting factor is the number of usable ports on a device.
 data ToxStruct a
 type Tox a = Ptr (ToxStruct a)
+
+type UserData a = StablePtr (MVar a)

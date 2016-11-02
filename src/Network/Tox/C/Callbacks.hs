@@ -8,9 +8,8 @@ import           Network.Tox.C.Type (Tox)
 
 
 -- | Low level event handler. The functions in this class are directly
--- registered with the corresponding C callback. Since userdata @a@ needs to be
--- in C memory, we recommend to keep it small, so marshalling costs are kept to
--- a minimum. Use 'StablePtr' to pass larger opaque Haskell values around in C.
+-- registered with the corresponding C callback. We use 'StablePtr' to pass
+-- opaque Haskell values around in C.
 class CHandler a where
   cSelfConnectionStatus   :: Tox.SelfConnectionStatusCb   a
   cFriendName             :: Tox.FriendNameCb             a
@@ -32,10 +31,10 @@ class CHandler a where
 -- | Installs an event handler into the passed 'Tox' instance. After performing
 -- the IO action, all event handlers are reset to null. This function does not
 -- save the original event handlers.
-withHandler :: CHandler a => Tox a -> IO r -> IO r
-withHandler tox =
-  install Tox.tox_callback_self_connection_status   (Tox.wrapSelfConnectionStatusCb   cSelfConnectionStatus  ) .
-  install Tox.tox_callback_friend_name              (Tox.wrapFriendNameCb             cFriendName            ) .
+withCHandler :: CHandler a => Tox a -> IO r -> IO r
+withCHandler tox =
+  install Tox.tox_callback_self_connection_status   (Tox.selfConnectionStatusCb   cSelfConnectionStatus  ) .
+  install Tox.tox_callback_friend_name              (Tox.friendNameCb             cFriendName            ) .
   install Tox.tox_callback_friend_status_message    (Tox.wrapFriendStatusMessageCb    cFriendStatusMessage   ) .
   install Tox.tox_callback_friend_status            (Tox.wrapFriendStatusCb           cFriendStatus          ) .
   install Tox.tox_callback_friend_connection_status (Tox.wrapFriendConnectionStatusCb cFriendConnectionStatus) .
@@ -56,5 +55,5 @@ withHandler tox =
         action
 
     uninstall cInstall cb = do
-      () <- cInstall tox nullFunPtr
       freeHaskellFunPtr cb
+      cInstall tox nullFunPtr

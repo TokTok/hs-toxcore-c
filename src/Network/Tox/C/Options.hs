@@ -3,19 +3,16 @@
 {-# LANGUAGE Safe          #-}
 module Network.Tox.C.Options where
 
-import           Control.Applicative       ((<$>), (<*>))
-import           Control.Exception         (bracket)
-import           Data.ByteString           (ByteString)
-import qualified Data.ByteString           as BS
-import           Data.ByteString.Arbitrary (fromABS)
-import           Data.Default.Class        (Default (..))
-import           Data.Word                 (Word16)
-import           Foreign.C.String          (CString, peekCString, withCString)
-import           Foreign.C.Types           (CInt (..), CSize (..))
-import           Foreign.Ptr               (Ptr, nullPtr)
-import           GHC.Generics              (Generic)
-import           Test.QuickCheck.Arbitrary (Arbitrary (..),
-                                            arbitraryBoundedEnum)
+import           Control.Applicative ((<$>))
+import           Control.Exception   (bracket)
+import           Data.ByteString     (ByteString)
+import qualified Data.ByteString     as BS
+import           Data.Default.Class  (Default (..))
+import           Data.Word           (Word16)
+import           Foreign.C.String    (CString, peekCString, withCString)
+import           Foreign.C.Types     (CInt (..), CSize (..))
+import           Foreign.Ptr         (Ptr, nullPtr)
+import           GHC.Generics        (Generic)
 
 import           Network.Tox.C.CEnum
 
@@ -36,9 +33,6 @@ data ProxyType
     -- SOCKS proxy for simple socket pipes.
   deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
-instance Arbitrary ProxyType where
-  arbitrary = arbitraryBoundedEnum
-
 
 -- Type of savedata to create the Tox instance from.
 data SavedataType
@@ -49,9 +43,6 @@ data SavedataType
   | SavedataTypeSecretKey
     -- Savedata is a secret key of length 'tox_secret_key_size'
   deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-instance Arbitrary SavedataType where
-  arbitrary = arbitraryBoundedEnum
 
 
 -- This struct contains all the startup options for Tox. You can either allocate
@@ -141,22 +132,6 @@ instance Default Options where
     , savedataType = SavedataTypeNone
     , savedataData = BS.empty
     }
-
-
-instance Arbitrary Options where
-  arbitrary = Options
-    <$> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitraryCString
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> (fromABS <$> arbitrary)
-    where
-      arbitraryCString = filter (/= '\NUL') <$> arbitrary
 
 
 data OptionsStruct

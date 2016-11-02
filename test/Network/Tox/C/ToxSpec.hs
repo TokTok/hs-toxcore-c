@@ -1,19 +1,40 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.ToxSpec where
 
-import           Control.Applicative               ((<$>))
-import qualified Crypto.Saltine.Class              as Sodium
-import qualified Crypto.Saltine.Core.Box           as Sodium
-import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxBeforeNM,
-                                                              boxNonce, boxPK,
-                                                              boxSK)
+import           Control.Applicative               ((<$>), (<*>))
+import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxPK, boxSK)
 import qualified Data.ByteString                   as BS
+import           Data.ByteString.Arbitrary         (fromABS)
 import           Data.Default.Class                (def)
 import           Data.Proxy                        (Proxy (..))
 import           Test.Hspec
 import           Test.QuickCheck
+import           Test.QuickCheck.Arbitrary         (arbitraryBoundedEnum)
 
 import qualified Network.Tox.C                     as C
+
+
+instance Arbitrary C.ProxyType where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary C.SavedataType where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary C.Options where
+  arbitrary = C.Options
+    <$> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitraryCString
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+    <*> (fromABS <$> arbitrary)
+    where
+      arbitraryCString = filter (/= '\NUL') <$> arbitrary
 
 
 getRight :: (Monad m, Show a) => Either a b -> m b
@@ -76,12 +97,12 @@ spec = do
   describe "public key" $ do
     it "is a prefix of the address" $
       must $ C.withDefaultTox $ \tox -> do
-        pk <- Sodium.encode <$> C.toxSelfGetPublicKey tox
+        pk <- C.toxSelfGetPublicKey tox
         addr <- C.toxSelfGetAddress tox
         BS.unpack addr `shouldStartWith` BS.unpack pk
 
     it "is not equal to the secret key" $
       must $ C.withDefaultTox $ \tox -> do
-        pk <- Sodium.encode <$> C.toxSelfGetPublicKey tox
-        sk <- Sodium.encode <$> C.toxSelfGetSecretKey tox
+        pk <- C.toxSelfGetPublicKey tox
+        sk <- C.toxSelfGetSecretKey tox
         pk `shouldNotBe` sk

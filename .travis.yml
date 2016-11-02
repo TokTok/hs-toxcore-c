@@ -7,6 +7,8 @@ cache:
     - $HOME/.ghc
 
 install:
+  - export CABAL_FLAGS="--enable-tests --enable-benchmarks --extra-include-dirs=$HOME/.ghc/usr/include --extra-lib-dirs=$HOME/.ghc/usr/lib"
+  # Install a recent version of happy, so other dependencies can be installed.
   - cabal install happy
   - cabal install hpc-coveralls "aeson < 0.11"
   # Where to find libraries.
@@ -16,12 +18,12 @@ install:
   - git clone --depth=1 --branch=stable https://github.com/jedisct1/libsodium
   - (cd libsodium && ./configure --prefix=$HOME/.ghc/usr && make install -j$(nproc))
   # c-toxcore
-  - git clone --depth=1 https://github.com/TokTok/toxcore
-  - (cd toxcore && cmake -B_build -H. -DCMAKE_INSTALL_PREFIX:PATH=$HOME/.ghc/usr && make -C_build install -j$(nproc))
-  - cabal install --only-dependencies --enable-tests --enable-benchmarks --extra-include-dirs=$HOME/.ghc/usr/include --extra-lib-dirs=$HOME/.ghc/usr/lib
+  - git clone --depth=1 https://github.com/TokTok/c-toxcore
+  - (cd c-toxcore && cmake -B_build -H. -DCMAKE_INSTALL_PREFIX:PATH=$HOME/.ghc/usr && make -C_build install -j$(nproc))
+  - cabal install --only-dependencies $CABAL_FLAGS
 
 script:
-  - cabal configure --enable-tests --enable-benchmarks --enable-library-coverage
+  - cabal configure --enable-library-coverage $CABAL_FLAGS
   - cabal build
   - cabal test
 

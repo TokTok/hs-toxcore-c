@@ -1,7 +1,5 @@
-{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE Trustworthy                #-}
-module Network.Tox.CSpec where
+module Main (main) where
 
 import           Control.Applicative     ((<$>))
 import           Control.Concurrent      (threadDelay)
@@ -18,7 +16,6 @@ import           Foreign.Ptr             (freeHaskellFunPtr, nullPtr)
 import           Foreign.StablePtr       (StablePtr, deRefStablePtr,
                                           freeStablePtr, newStablePtr)
 import           Foreign.Storable        (Storable (..))
-import           Test.Hspec
 
 import qualified Network.Tox.C           as C
 
@@ -81,20 +78,18 @@ toxIterate ud tox =
   withStablePtr ud (C.tox_iterate tox)
 
 
-spec :: Spec
-spec =
-  describe "toxcore" $
-    it "can bootstrap" $
-      must $ C.withOptions options $ \optPtr ->
-        must $ C.withTox optPtr $ \tox -> do
-          must $ C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
-          must $ C.toxAddTcpRelay tox bootstrapHost 33445 bootstrapKey
+main :: IO ()
+main =
+  must $ C.withOptions options $ \optPtr ->
+    must $ C.withTox optPtr $ \tox -> do
+      must $ C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
+      must $ C.toxAddTcpRelay tox bootstrapHost 33445 bootstrapKey
 
-          C.withCHandler tox $ do
-            ud <- newMVar (UserData 1234)
-            while ((/= UserData 4321) <$> readMVar ud) $ do
-              toxIterate ud tox
-              putStrLn "tox_iterate"
-              interval <- C.tox_iteration_interval tox
-              threadDelay $ fromIntegral $ interval * 10000
-            putStrLn "done"
+      C.withCHandler tox $ do
+        ud <- newMVar (UserData 1234)
+        while ((/= UserData 4321) <$> readMVar ud) $ do
+          toxIterate ud tox
+          putStrLn "tox_iterate"
+          interval <- C.tox_iteration_interval tox
+          threadDelay $ fromIntegral $ interval * 10000
+        putStrLn "done"
