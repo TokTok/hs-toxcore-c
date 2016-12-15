@@ -48,6 +48,7 @@ executable groupbot
   ghc-options:
       -Wall
       -fno-warn-unused-imports
+  extra-libraries: toxcore
   build-depends:
       base < 5
     , base16-bytestring
@@ -74,3 +75,6 @@ test-suite testsuite
     , saltine
     , toxcore
   main-is: testsuite.hs
+  other-modules:
+      Network.Tox.C.ToxSpec
+      Network.Tox.CSpec
