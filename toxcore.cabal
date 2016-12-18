@@ -74,3 +74,6 @@ test-suite testsuite
     , saltine
     , toxcore
   main-is: testsuite.hs
+  other-modules:
+      Network.Tox.C.ToxSpec
+    , Network.Tox.CSpec
