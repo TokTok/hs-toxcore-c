@@ -86,11 +86,13 @@ import           Control.Exception       (bracket)
 import           Control.Monad           ((>=>))
 import qualified Data.ByteString         as BS
 import           Data.Word               (Word16, Word32, Word64)
-import           Foreign.C.String        (CString, withCString)
+import           Foreign.C.String        (CString, withCString, withCStringLen, peekCStringLen)
 import           Foreign.C.Types         (CInt (..), CSize (..))
-import           Foreign.Marshal.Array   (allocaArray)
+import           Foreign.Marshal.Alloc   (alloca)
+import           Foreign.Marshal.Array   (allocaArray, peekArray)
 import           Foreign.Ptr             (FunPtr, Ptr, nullPtr)
 import           Foreign.StablePtr       (deRefStablePtr)
+import           Foreign.Storable        (peek)
 
 import           Network.Tox.C.CEnum
 import           Network.Tox.C.Constants
@@ -100,10 +102,15 @@ import           Network.Tox.C.Type
 
 --------------------------------------------------------------------------------
 --
--- :: Global enumerations
+-- :: Global types
 --
 --------------------------------------------------------------------------------
 
+-- Should we introduce such types?
+-- newtype FriendNum = FriendNum { friendNum :: Word32 } deriving (Eq, Ord, Read, Show)
+-- newtype ConferenceNum = ConferenceNum { conferenceNum :: Word32 } deriving (Eq, Ord, Read, Show)
+-- newtype PeerNum = PeerNum { peerNum :: Word32 } deriving (Eq, Ord, Read, Show)
+-- newtype FileNum = FileNum { fileNum :: Word32 } deriving (Eq, Ord, Read, Show)
 
 -- | Represents the possible statuses a client can have.
 data UserStatus
@@ -204,9 +211,12 @@ toxNew = callErrFun . tox_new
 -- functions can be called, and the pointer value can no longer be read.
 foreign import ccall tox_kill :: Tox a -> IO ()
 
+toxKill :: Tox a -> IO ()
+toxKill = tox_kill
+
 withTox :: OptionsPtr -> (Tox a -> IO r) -> IO (Either ErrNew r)
 withTox options f =
-  bracket (toxNew options) (either (const $ return ()) tox_kill) $ \case
+  bracket (toxNew options) (either (const $ return ()) toxKill) $ \case
     Left err -> return $ Left err
     Right ok -> Right <$> f ok
 
@@ -228,6 +238,13 @@ foreign import ccall tox_get_savedata_size :: Tox a -> IO CSize
 --   Call tox_get_savedata_size to find the number of bytes required. If this
 --   parameter is 'nullPtr', this function has no effect.
 foreign import ccall tox_get_savedata :: Tox a -> CString -> IO ()
+
+toxGetSavedata :: Tox a -> IO BS.ByteString
+toxGetSavedata tox = do
+  savedataLen <- tox_get_savedata_size tox
+  allocaArray (fromIntegral savedataLen) $ \savedataPtr -> do
+    tox_get_savedata tox savedataPtr
+    BS.packCStringLen (savedataPtr, fromIntegral savedataLen)
 
 
 --------------------------------------------------------------------------------
@@ -317,11 +334,15 @@ data Connection
 
 
 -- | @param connection_status Whether we are connected to the DHT.
-type SelfConnectionStatusCb a = Tox a -> CEnum Connection -> a -> IO a
+type SelfConnectionStatusCb a = Tox a -> Connection -> a -> IO a
 type CSelfConnectionStatusCb a = Tox a -> CEnum Connection -> UserData a -> IO ()
 foreign import ccall "wrapper" wrapSelfConnectionStatusCb :: CSelfConnectionStatusCb a -> IO (FunPtr (CSelfConnectionStatusCb a))
+
+callSelfConnectionStatusCb :: SelfConnectionStatusCb a -> CSelfConnectionStatusCb a
+callSelfConnectionStatusCb f tox conn = deRefStablePtr >=> (`modifyMVar_` f tox (fromCEnum conn))
+
 selfConnectionStatusCb :: SelfConnectionStatusCb a -> IO (FunPtr (CSelfConnectionStatusCb a))
-selfConnectionStatusCb = wrapSelfConnectionStatusCb . \f a b -> deRefStablePtr >=> (`modifyMVar_` f a b)
+selfConnectionStatusCb = wrapSelfConnectionStatusCb . callSelfConnectionStatusCb
 
 
 -- | Set the callback for the `self_connection_status` event. Pass 'nullPtr' to
@@ -339,10 +360,14 @@ foreign import ccall tox_callback_self_connection_status :: Tox a -> FunPtr (CSe
 -- | Return the time in milliseconds before tox_iterate() should be called again
 -- for optimal performance.
 foreign import ccall tox_iteration_interval :: Tox a -> IO Word32
+toxIterationInterval :: Tox a -> IO Word32
+toxIterationInterval = tox_iteration_interval
 
 -- | The main loop that needs to be run in intervals of tox_iteration_interval()
 -- milliseconds.
 foreign import ccall tox_iterate :: Tox a -> UserData a -> IO ()
+toxIterate :: Tox a -> UserData a -> IO ()
+toxIterate = tox_iterate
 
 
 --------------------------------------------------------------------------------
@@ -364,17 +389,21 @@ foreign import ccall tox_self_get_address :: Tox a -> CString -> IO ()
 toxSelfGetAddress :: Tox a -> IO BS.ByteString
 toxSelfGetAddress tox =
   let addrLen = fromIntegral tox_address_size in
-  allocaArray addrLen $ \addrArr -> do
-    tox_self_get_public_key tox addrArr
-    BS.packCStringLen (addrArr, addrLen)
+  allocaArray addrLen $ \addrPtr -> do
+    tox_self_get_address tox addrPtr
+    BS.packCStringLen (addrPtr, addrLen)
 
 -- | Set the 4-byte nospam part of the address.
 --
 -- @param nospam Any 32 bit unsigned integer.
 foreign import ccall tox_self_set_nospam :: Tox a -> Word32 -> IO ()
+toxSelfSetNospam :: Tox a -> Word32 -> IO ()
+toxSelfSetNospam = tox_self_set_nospam
 
 -- | Get the 4-byte nospam part of the address.
 foreign import ccall tox_self_get_nospam :: Tox a -> IO Word32
+toxSelfGetNospam :: Tox a -> IO Word32
+toxSelfGetNospam = tox_self_get_nospam
 
 -- | Copy the Tox Public Key (long term) from the Tox object.
 --
@@ -385,9 +414,9 @@ foreign import ccall tox_self_get_public_key :: Tox a -> CString -> IO ()
 toxSelfGetPublicKey :: Tox a -> IO BS.ByteString
 toxSelfGetPublicKey tox =
   let pkLen = fromIntegral tox_public_key_size in
-  allocaArray pkLen $ \pkArr -> do
-    tox_self_get_public_key tox pkArr
-    BS.packCStringLen (pkArr, pkLen)
+  allocaArray pkLen $ \pkPtr -> do
+    tox_self_get_public_key tox pkPtr
+    BS.packCStringLen (pkPtr, pkLen)
 
 -- | Copy the Tox Secret Key from the Tox object.
 --
@@ -398,9 +427,9 @@ foreign import ccall tox_self_get_secret_key :: Tox a -> CString -> IO ()
 toxSelfGetSecretKey :: Tox a -> IO BS.ByteString
 toxSelfGetSecretKey tox =
   let skLen = fromIntegral tox_secret_key_size in
-  allocaArray skLen $ \skArr -> do
-    tox_self_get_secret_key tox skArr
-    BS.packCStringLen (skArr, skLen)
+  allocaArray skLen $ \skPtr -> do
+    tox_self_get_secret_key tox skPtr
+    BS.packCStringLen (skPtr, skLen)
 
 
 --------------------------------------------------------------------------------
@@ -436,6 +465,15 @@ data ErrSetInfo
 --
 -- @return true on success.
 foreign import ccall tox_self_set_name :: Tox a -> CString -> CSize -> CErr ErrSetInfo -> IO ()
+callSelfSetNameFun :: (Tox a -> CString -> CSize -> CErr ErrSetInfo -> IO ()) ->
+                      Tox a -> String -> IO (Either ErrSetInfo ())
+callSelfSetNameFun f tox name =
+  withCStringLen name $ \(nameStr, nameLen) ->
+    callErrFun $ f tox nameStr (fromIntegral nameLen)
+
+toxSelfSetName :: Tox a -> String -> IO (Either ErrSetInfo ())
+toxSelfSetName = callSelfSetNameFun tox_self_set_name
+
 
 -- | Set the client's status message.
 --
@@ -443,11 +481,21 @@ foreign import ccall tox_self_set_name :: Tox a -> CString -> CSize -> CErr ErrS
 -- length is 0, the status parameter is ignored (it can be 'nullPtr'), and the
 -- user status is set back to empty.
 foreign import ccall tox_self_set_status_message :: Tox a -> CString -> CSize -> CErr ErrSetInfo -> IO ()
+callSelfSetStatusMessageFun :: (Tox a -> CString -> CSize -> CErr ErrSetInfo -> IO ()) ->
+                               Tox a -> String -> IO (Either ErrSetInfo ())
+callSelfSetStatusMessageFun f tox statusMsg =
+  withCStringLen statusMsg $ \(statusMsgStr, statusMsgLen) ->
+    callErrFun $ f tox statusMsgStr (fromIntegral statusMsgLen)
+
+toxSelfSetStatusMessage :: Tox a -> String -> IO (Either ErrSetInfo ())
+toxSelfSetStatusMessage = callSelfSetStatusMessageFun tox_self_set_status_message
 
 -- | Set the client's user status.
 --
 -- @param user_status One of the user statuses listed in the enumeration above.
 foreign import ccall tox_self_set_status :: Tox a -> CEnum UserStatus -> IO ()
+toxSelfSetStatus :: Tox a -> UserStatus -> IO ()
+toxSelfSetStatus tox userStatus = tox_self_set_status tox $ toCEnum userStatus
 
 
 --------------------------------------------------------------------------------
@@ -513,6 +561,15 @@ data ErrFriendAdd
 --
 -- @return the friend number on success, UINT32_MAX on failure.
 foreign import ccall tox_friend_add :: Tox a -> CString -> CString -> CSize -> CErr ErrFriendAdd -> IO Word32
+callFriendAddFun :: (Tox a -> CString -> CString -> CSize -> CErr ErrFriendAdd -> IO Word32) ->
+                    Tox a -> BS.ByteString -> String -> IO (Either ErrFriendAdd Word32)
+callFriendAddFun f tox address message =
+  withCStringLen message $ \(msgStr, msgLen) ->
+    BS.useAsCString address $ \addr' ->
+      callErrFun $ f tox addr' msgStr (fromIntegral msgLen)
+
+toxFriendAdd :: Tox a -> BS.ByteString -> String -> IO (Either ErrFriendAdd Word32)
+toxFriendAdd = callFriendAddFun tox_friend_add
 
 -- | Add a friend without sending a friend request.
 --
@@ -531,6 +588,14 @@ foreign import ccall tox_friend_add :: Tox a -> CString -> CString -> CSize -> C
 -- @return the friend number on success, UINT32_MAX on failure.
 -- @see tox_friend_add for a more detailed description of friend numbers.
 foreign import ccall tox_friend_add_norequest :: Tox a -> CString -> CErr ErrFriendAdd -> IO Word32
+callFriendAddNorequestFun :: (Tox a -> CString -> CErr ErrFriendAdd -> IO Word32) ->
+                    Tox a -> BS.ByteString -> IO (Either ErrFriendAdd Word32)
+callFriendAddNorequestFun f tox address =
+  BS.useAsCString address $ \addr' ->
+    callErrFun $ f tox addr'
+
+toxFriendAddNorequest :: Tox a -> BS.ByteString -> IO (Either ErrFriendAdd Word32)
+toxFriendAddNorequest = callFriendAddNorequestFun tox_friend_add_norequest
 
 
 data ErrFriendDelete
@@ -553,6 +618,9 @@ data ErrFriendDelete
 --
 -- @return true on success.
 foreign import ccall tox_friend_delete :: Tox a -> Word32 -> CErr ErrFriendDelete -> IO ()
+
+toxFriendDelete :: Tox a -> Word32 -> IO (Either ErrFriendDelete ())
+toxFriendDelete tox fn = callErrFun $ tox_friend_delete tox fn
 
 
 --------------------------------------------------------------------------------
@@ -580,10 +648,20 @@ data ErrFriendByPublicKey
 -- @return the friend number on success, UINT32_MAX on failure.
 -- @param public_key A byte array containing the Public Key.
 foreign import ccall tox_friend_by_public_key :: Tox a -> CString -> CErr ErrFriendByPublicKey -> IO Word32
+callFriendByPublicKey :: (Tox a -> CString -> CErr ErrFriendByPublicKey -> IO Word32) ->
+                         Tox a -> BS.ByteString -> IO (Either ErrFriendByPublicKey Word32)
+callFriendByPublicKey f tox address =
+  BS.useAsCString address $ \addr' ->
+    callErrFun $ f tox addr'
+
+toxFriendByPublicKey :: Tox a -> BS.ByteString -> IO (Either ErrFriendByPublicKey Word32)
+toxFriendByPublicKey = callFriendByPublicKey tox_friend_by_public_key
 
 -- | Checks if a friend with the given friend number exists and returns true if
 -- it does.
 foreign import ccall tox_friend_exists :: Tox a -> Word32 -> IO Bool
+toxFriendExists :: Tox a -> Word32 -> IO Bool
+toxFriendExists = tox_friend_exists
 
 -- | Return the number of friends on the friend list.
 --
@@ -599,6 +677,13 @@ foreign import ccall tox_self_get_friend_list_size :: Tox a -> IO CSize
 -- @param list A memory region with enough space to hold the friend list. If
 --   this parameter is 'nullPtr', this function has no effect.
 foreign import ccall tox_self_get_friend_list :: Tox a -> Ptr Word32 -> IO ()
+
+toxSelfGetFriendList :: Tox a -> IO [Word32]
+toxSelfGetFriendList tox = do
+  friendListSize <- tox_self_get_friend_list_size tox
+  allocaArray (fromIntegral friendListSize) $ \friendListPtr -> do
+    tox_self_get_friend_list tox friendListPtr
+    peekArray (fromIntegral friendListSize) friendListPtr
 
 data ErrFriendGetPublicKey
   = ErrFriendGetPublicKeyOk
@@ -618,6 +703,21 @@ data ErrFriendGetPublicKey
 --
 -- @return true on success.
 foreign import ccall tox_friend_get_public_key :: Tox a -> Word32 -> CString -> CErr ErrFriendGetPublicKey -> IO Bool
+callFriendGetPublicKey :: (Tox a -> Word32 -> CString -> CErr ErrFriendGetPublicKey -> IO Bool) ->
+                          Tox a -> Word32 -> IO (Either ErrFriendGetPublicKey BS.ByteString)
+callFriendGetPublicKey f tox fn =
+  let pkLen = fromIntegral tox_public_key_size in
+  alloca $ \errPtr -> do
+    allocaArray pkLen $ \pkPtr -> do
+      _ <- f tox fn pkPtr errPtr
+      err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
+      str <- BS.packCStringLen (pkPtr, pkLen)
+      return $ if err /= minBound
+               then Left  err
+               else Right str
+
+toxFriendGetPublicKey :: Tox a -> Word32 -> IO (Either ErrFriendGetPublicKey BS.ByteString)
+toxFriendGetPublicKey = callFriendGetPublicKey tox_friend_get_public_key
 
 
 --------------------------------------------------------------------------------
@@ -632,11 +732,19 @@ foreign import ccall tox_friend_get_public_key :: Tox a -> Word32 -> CString -> 
 --   tox_friend_get_name would write to its `name` parameter.
 -- @param length A value equal to the return value of
 --   tox_friend_get_name_size.
-type FriendNameCb a = Tox a -> Word32 -> CString -> CSize -> a -> IO a
+type FriendNameCb a = Tox a -> Word32 -> String -> a -> IO a
 type CFriendNameCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
 foreign import ccall "wrapper" wrapFriendNameCb :: CFriendNameCb a -> IO (FunPtr (CFriendNameCb a))
+
+callFriendNameCb :: FriendNameCb a -> CFriendNameCb a
+callFriendNameCb f tox fn nameStr nameLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  name <- peekCStringLen (nameStr, fromIntegral nameLen)
+  modifyMVar_ ud $ f tox fn name
+
 friendNameCb :: FriendNameCb a -> IO (FunPtr (CFriendNameCb a))
-friendNameCb = wrapFriendNameCb . \f a b c d -> deRefStablePtr >=> (`modifyMVar_` f a b c d)
+friendNameCb = wrapFriendNameCb . callFriendNameCb
+
 
 -- | Set the callback for the `friend_name` event. Pass 'nullPtr' to unset.
 --
@@ -651,35 +759,61 @@ foreign import ccall tox_callback_friend_name :: Tox a -> FunPtr (CFriendNameCb 
 --   parameter.
 -- @param length A value equal to the return value of
 --   tox_friend_get_status_message_size.
-type FriendStatusMessageCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendStatusMessageCb :: FriendStatusMessageCb a -> IO (FunPtr (FriendStatusMessageCb a))
+type FriendStatusMessageCb a = Tox a -> Word32 -> String -> a -> IO a
+type CFriendStatusMessageCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendStatusMessageCb :: CFriendStatusMessageCb a -> IO (FunPtr (CFriendStatusMessageCb a))
+
+callFriendStatusMessageCb :: FriendStatusMessageCb a -> CFriendStatusMessageCb a
+callFriendStatusMessageCb f tox fn statusMessageStr statusMessageLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  statusMessage <- peekCStringLen (statusMessageStr, fromIntegral statusMessageLen)
+  modifyMVar_ ud $ f tox fn statusMessage
+
+friendStatusMessageCb :: FriendStatusMessageCb a -> IO (FunPtr (CFriendStatusMessageCb a))
+friendStatusMessageCb = wrapFriendStatusMessageCb . callFriendStatusMessageCb
+
 
 -- | Set the callback for the `friend_status_message` event. Pass 'nullPtr' to
 -- unset.
 --
 -- This event is triggered when a friend changes their status message.
-foreign import ccall tox_callback_friend_status_message :: Tox a -> FunPtr (FriendStatusMessageCb a) -> IO ()
+foreign import ccall tox_callback_friend_status_message :: Tox a -> FunPtr (CFriendStatusMessageCb a) -> IO ()
 
 
 -- | @param friend_number The friend number of the friend whose user status
 --   changed.
 -- @param status The new user status.
-type FriendStatusCb a = Tox a -> Word32 -> CEnum UserStatus -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendStatusCb :: FriendStatusCb a -> IO (FunPtr (FriendStatusCb a))
+type FriendStatusCb a = Tox a -> Word32 -> UserStatus -> a -> IO a
+type CFriendStatusCb a = Tox a -> Word32 -> CEnum UserStatus -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendStatusCb :: CFriendStatusCb a -> IO (FunPtr (CFriendStatusCb a))
+
+callFriendStatusCb :: FriendStatusCb a -> CFriendStatusCb a
+callFriendStatusCb f tox fn status = deRefStablePtr >=> (`modifyMVar_` f tox fn (fromCEnum status))
+
+friendStatusCb :: FriendStatusCb a -> IO (FunPtr (CFriendStatusCb a))
+friendStatusCb = wrapFriendStatusCb . callFriendStatusCb
 
 
 -- | Set the callback for the `friend_status` event. Pass 'nullPtr' to unset.
 --
 -- This event is triggered when a friend changes their user status.
-foreign import ccall tox_callback_friend_status :: Tox a -> FunPtr (FriendStatusCb a) -> IO ()
+foreign import ccall tox_callback_friend_status :: Tox a -> FunPtr (CFriendStatusCb a) -> IO ()
 
 
 -- | @param friend_number The friend number of the friend whose connection
 --   status changed.
 -- @param connection_status The result of calling
 --   tox_friend_get_connection_status on the passed friend_number.
-type FriendConnectionStatusCb a = Tox a -> Word32 -> CEnum Connection -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendConnectionStatusCb :: FriendConnectionStatusCb a -> IO (FunPtr (FriendConnectionStatusCb a))
+type FriendConnectionStatusCb a = Tox a -> Word32 -> Connection -> a -> IO a
+type CFriendConnectionStatusCb a = Tox a -> Word32 -> CEnum Connection -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendConnectionStatusCb :: CFriendConnectionStatusCb a -> IO (FunPtr (CFriendConnectionStatusCb a))
+
+callFriendConnectionStatusCb :: FriendConnectionStatusCb a -> CFriendConnectionStatusCb a
+callFriendConnectionStatusCb f tox fn connectionStatus = deRefStablePtr >=> (`modifyMVar_` f tox fn (fromCEnum connectionStatus))
+
+friendConnectionStatusCb :: FriendConnectionStatusCb a -> IO (FunPtr (CFriendConnectionStatusCb a))
+friendConnectionStatusCb = wrapFriendConnectionStatusCb . callFriendConnectionStatusCb
+
 
 -- | Set the callback for the `friend_connection_status` event. Pass 'nullPtr'
 -- to unset.
@@ -689,20 +823,27 @@ foreign import ccall "wrapper" wrapFriendConnectionStatusCb :: FriendConnectionS
 --
 -- This callback is not called when adding friends. It is assumed that when
 -- adding friends, their connection status is initially offline.
-foreign import ccall tox_callback_friend_connection_status :: Tox a -> FunPtr (FriendConnectionStatusCb a) -> IO ()
+foreign import ccall tox_callback_friend_connection_status :: Tox a -> FunPtr (CFriendConnectionStatusCb a) -> IO ()
 
 
 -- | @param friend_number The friend number of the friend who started or stopped
 --   typing.
 -- @param is_typing The result of calling tox_friend_get_typing on the passed
 --   friend_number.
-type FriendTypingCb a = Tox a -> Word32 -> Bool -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendTypingCb :: FriendTypingCb a -> IO (FunPtr (FriendTypingCb a))
+type FriendTypingCb a = Tox a -> Word32 -> Bool -> a -> IO a
+type CFriendTypingCb a = Tox a -> Word32 -> Bool -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendTypingCb :: CFriendTypingCb a -> IO (FunPtr (CFriendTypingCb a))
+
+callFriendTypingCb :: FriendTypingCb a -> CFriendTypingCb a
+callFriendTypingCb f tox fn typing = deRefStablePtr >=> (`modifyMVar_` f tox fn typing)
+
+friendTypingCb :: FriendTypingCb a -> IO (FunPtr (CFriendTypingCb a))
+friendTypingCb = wrapFriendTypingCb . callFriendTypingCb
 
 -- | Set the callback for the `friend_typing` event. Pass 'nullPtr' to unset.
 --
 -- This event is triggered when a friend starts or stops typing.
-foreign import ccall tox_callback_friend_typing :: Tox a -> FunPtr (FriendTypingCb a) -> IO ()
+foreign import ccall tox_callback_friend_typing :: Tox a -> FunPtr (CFriendTypingCb a) -> IO ()
 
 
 --------------------------------------------------------------------------------
@@ -730,6 +871,12 @@ data ErrSetTyping
 --
 -- @return true on success.
 foreign import ccall tox_self_set_typing :: Tox a -> Word32 -> Bool -> CErr ErrSetTyping -> IO Bool
+callSelfSetTyping :: (Tox a -> Word32 -> Bool -> CErr ErrSetTyping -> IO Bool) ->
+                     Tox a -> Word32 -> Bool -> IO (Either ErrSetTyping Bool)
+callSelfSetTyping f tox fn typing = callErrFun $ f tox fn typing
+
+toxSelfSetTyping :: Tox a -> Word32 -> Bool -> IO (Either ErrSetTyping Bool)
+toxSelfSetTyping = callSelfSetTyping tox_self_set_typing
 
 data ErrFriendSendMessage
   = ErrFriendSendMessageOk
@@ -779,13 +926,29 @@ data ErrFriendSendMessage
 --   containing the message text.
 -- @param length Length of the message to be sent.
 foreign import ccall tox_friend_send_message :: Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrFriendSendMessage -> IO Word32
+callFriendSendMessage :: (Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrFriendSendMessage -> IO Word32) ->
+                         Tox a -> Word32 -> MessageType -> String -> IO (Either ErrFriendSendMessage Word32)
+callFriendSendMessage f tox fn messageType message =
+  withCStringLen message $ \(msgStr, msgLen) ->
+    callErrFun $ f tox fn (toCEnum messageType) msgStr (fromIntegral msgLen)
+
+toxFriendSendMessage :: Tox a -> Word32 -> MessageType -> String -> IO (Either ErrFriendSendMessage Word32)
+toxFriendSendMessage = callFriendSendMessage tox_friend_send_message
+
 
 -- | @param friend_number The friend number of the friend who received the
 --   message.
 -- @param message_id The message ID as returned from tox_friend_send_message
 --   corresponding to the message sent.
-type FriendReadReceiptCb a = Tox a -> Word32 -> Word32 -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendReadReceiptCb :: FriendReadReceiptCb a -> IO (FunPtr (FriendReadReceiptCb a))
+type FriendReadReceiptCb a = Tox a -> Word32 -> Word32 -> a -> IO a
+type CFriendReadReceiptCb a = Tox a -> Word32 -> Word32 -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendReadReceiptCb :: CFriendReadReceiptCb a -> IO (FunPtr (CFriendReadReceiptCb a))
+
+callFriendReadReceiptCb :: FriendReadReceiptCb a -> CFriendReadReceiptCb a
+callFriendReadReceiptCb f tox fn msgId = deRefStablePtr >=> (`modifyMVar_` f tox fn msgId)
+
+friendReadReceiptCb :: FriendReadReceiptCb a -> IO (FunPtr (CFriendReadReceiptCb a))
+friendReadReceiptCb = wrapFriendReadReceiptCb . callFriendReadReceiptCb
 
 
 -- | Set the callback for the `friend_read_receipt` event. Pass 'nullPtr' to
@@ -793,7 +956,7 @@ foreign import ccall "wrapper" wrapFriendReadReceiptCb :: FriendReadReceiptCb a 
 --
 -- This event is triggered when the friend receives the message sent with
 -- tox_friend_send_message with the corresponding message ID.
-foreign import ccall tox_callback_friend_read_receipt :: Tox a -> FunPtr (FriendReadReceiptCb a) -> IO ()
+foreign import ccall tox_callback_friend_read_receipt :: Tox a -> FunPtr (CFriendReadReceiptCb a) -> IO ()
 
 
 --------------------------------------------------------------------------------
@@ -811,14 +974,26 @@ foreign import ccall tox_callback_friend_read_receipt :: Tox a -> FunPtr (Friend
 --   approximation of when it was composed.
 -- @param message The message they sent along with the request.
 -- @param length The size of the message byte array.
-type FriendRequestCb a = Tox a -> CString -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendRequestCb :: FriendRequestCb a -> IO (FunPtr (FriendRequestCb a))
+type FriendRequestCb a = Tox a -> BS.ByteString -> String -> a -> IO a
+type CFriendRequestCb a = Tox a -> CString -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendRequestCb :: CFriendRequestCb a -> IO (FunPtr (CFriendRequestCb a))
+
+callFriendRequestCb :: FriendRequestCb a -> CFriendRequestCb a
+callFriendRequestCb f tox addrPtr nameStr nameLen udPtr = do
+  let addrLen = fromIntegral tox_address_size
+  ud <- deRefStablePtr udPtr
+  addr <- BS.packCStringLen (addrPtr, addrLen)
+  name <- peekCStringLen (nameStr, fromIntegral nameLen)
+  modifyMVar_ ud $ f tox addr name
+
+friendRequestCb :: FriendRequestCb a -> IO (FunPtr (CFriendRequestCb a))
+friendRequestCb = wrapFriendRequestCb . callFriendRequestCb
 
 
 -- | Set the callback for the `friend_request` event. Pass 'nullPtr' to unset.
 --
 -- This event is triggered when a friend request is received.
-foreign import ccall tox_callback_friend_request :: Tox a -> FunPtr (FriendRequestCb a) -> IO ()
+foreign import ccall tox_callback_friend_request :: Tox a -> FunPtr (CFriendRequestCb a) -> IO ()
 
 -- | @param friend_number The friend number of the friend who sent the message.
 -- @param time_delta Time between composition and sending.
@@ -826,14 +1001,24 @@ foreign import ccall tox_callback_friend_request :: Tox a -> FunPtr (FriendReque
 -- @param length The size of the message byte array.
 --
 -- @see friend_request for more information on time_delta.
-type FriendMessageCb a = Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendMessageCb :: FriendMessageCb a -> IO (FunPtr (FriendMessageCb a))
+type FriendMessageCb a = Tox a -> Word32 -> MessageType -> String -> a -> IO a
+type CFriendMessageCb a = Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendMessageCb :: CFriendMessageCb a -> IO (FunPtr (CFriendMessageCb a))
+
+callFriendMessageCb :: FriendMessageCb a -> CFriendMessageCb a
+callFriendMessageCb f tox fn msgType msgStr msgLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  msg <- peekCStringLen (msgStr, fromIntegral msgLen)
+  modifyMVar_ ud $ f tox fn (fromCEnum msgType) msg
+
+friendMessageCb :: FriendMessageCb a -> IO (FunPtr (CFriendMessageCb a))
+friendMessageCb = wrapFriendMessageCb . callFriendMessageCb
 
 
 -- | Set the callback for the `friend_message` event. Pass 'nullPtr' to unset.
 --
 -- This event is triggered when a message from a friend is received.
-foreign import ccall tox_callback_friend_message :: Tox a -> FunPtr (FriendMessageCb a) -> IO ()
+foreign import ccall tox_callback_friend_message :: Tox a -> FunPtr (CFriendMessageCb a) -> IO ()
 
 
 --------------------------------------------------------------------------------
@@ -862,8 +1047,15 @@ foreign import ccall tox_callback_friend_message :: Tox a -> FunPtr (FriendMessa
 -- @return true if hash was not 'nullPtr'.
 foreign import ccall tox_hash :: CString -> CString -> CSize -> IO Bool
 
-data FileKind
+toxHash :: BS.ByteString -> IO BS.ByteString
+toxHash d = do
+  let hashLen = fromIntegral tox_hash_length
+  allocaArray hashLen $ \hashPtr -> do
+    BS.useAsCStringLen d $ \(dataPtr, dataLen) -> do
+      _ <- tox_hash hashPtr dataPtr (fromIntegral dataLen)
+      BS.packCStringLen (dataPtr, fromIntegral dataLen)
 
+data FileKind
   = FileKindData
     -- Arbitrary file data. Clients can choose to handle it based on the file
     -- name or magic or any other way they choose.
@@ -945,6 +1137,13 @@ data ErrFileControl
 -- @return true on success.
 foreign import ccall tox_file_control :: Tox a -> Word32 -> Word32 -> CEnum FileControl -> CErr ErrFileControl -> IO Bool
 
+callFileControl :: (Tox a -> Word32 -> Word32 -> CEnum FileControl -> CErr ErrFileControl -> IO Bool) ->
+                   Tox a -> Word32 -> Word32 -> FileControl -> IO (Either ErrFileControl Bool)
+callFileControl f tox fn fileNum control = callErrFun $ f tox fn fileNum (toCEnum control)
+
+toxFileControl :: Tox a -> Word32 -> Word32 -> FileControl -> IO (Either ErrFileControl Bool)
+toxFileControl = callFileControl tox_file_control
+
 -- | When receiving FileControlCancel, the client should release the
 -- resources associated with the file number and consider the transfer failed.
 --
@@ -952,8 +1151,15 @@ foreign import ccall tox_file_control :: Tox a -> Word32 -> Word32 -> CEnum File
 -- @param file_number The friend-specific file number the data received is
 --   associated with.
 -- @param control The file control command received.
-type FileRecvControlCb a = Tox a -> Word32 -> Word32 -> CEnum FileControl -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFileRecvControlCb :: FileRecvControlCb a -> IO (FunPtr (FileRecvControlCb a))
+type FileRecvControlCb a = Tox a -> Word32 -> Word32 -> FileControl -> a -> IO a
+type CFileRecvControlCb a = Tox a -> Word32 -> Word32 -> CEnum FileControl -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFileRecvControlCb :: CFileRecvControlCb a -> IO (FunPtr (CFileRecvControlCb a))
+
+callFileRecvControlCb :: FileRecvControlCb a -> CFileRecvControlCb a
+callFileRecvControlCb f tox fn fileNum ctrlCmd = deRefStablePtr >=> (`modifyMVar_` f tox fn fileNum (fromCEnum ctrlCmd))
+
+fileRecvControlCb :: FileRecvControlCb a -> IO (FunPtr (CFileRecvControlCb a))
+fileRecvControlCb = wrapFileRecvControlCb . callFileRecvControlCb
 
 
 -- | Set the callback for the `file_recv_control` event. Pass 'nullPtr' to
@@ -961,7 +1167,7 @@ foreign import ccall "wrapper" wrapFileRecvControlCb :: FileRecvControlCb a -> I
 --
 -- This event is triggered when a file control command is received from a
 -- friend.
-foreign import ccall tox_callback_file_recv_control :: Tox a -> FunPtr (FileRecvControlCb a) -> IO ()
+foreign import ccall tox_callback_file_recv_control :: Tox a -> FunPtr (CFileRecvControlCb a) -> IO ()
 
 data ErrFileSeek
   = ErrFileSeekOk
@@ -998,6 +1204,14 @@ data ErrFileSeek
 -- @param position The position that the file should be seeked to.
 foreign import ccall tox_file_seek :: Tox a -> Word32 -> Word32 -> Word64 -> CErr ErrFileSeek -> IO Bool
 
+callFileSeek :: (Tox a -> Word32 -> Word32 -> Word64 -> CErr ErrFileSeek -> IO Bool) ->
+                   Tox a -> Word32 -> Word32 -> Word64 -> IO (Either ErrFileSeek Bool)
+callFileSeek f tox fn fileNum pos = callErrFun $ f tox fn fileNum pos
+
+toxFileSeek :: Tox a -> Word32 -> Word32 -> Word64 -> IO (Either ErrFileSeek Bool)
+toxFileSeek = callFileSeek tox_file_seek
+
+
 data ErrFileGet
   = ErrFileGetOk
     -- The function returned successfully.
@@ -1024,6 +1238,22 @@ data ErrFileGet
 --
 -- @return true on success.
 foreign import ccall tox_file_get_file_id :: Tox a -> Word32 -> Word32 -> CString -> CErr ErrFileGet -> IO Bool
+
+callFileGetFileId :: (Tox a -> Word32 -> Word32 -> CString -> CErr ErrFileGet -> IO Bool) ->
+                     Tox a -> Word32 -> Word32 -> IO (Either ErrFileGet BS.ByteString)
+callFileGetFileId f tox fn fileNum =
+  let fileIdLen = fromIntegral tox_file_id_length in
+  alloca $ \errPtr -> do
+    allocaArray fileIdLen $ \fileIdPtr -> do
+      _ <- f tox fn fileNum fileIdPtr errPtr
+      err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
+      fileId <- BS.packCStringLen (fileIdPtr, fileIdLen)
+      return $ if err /= minBound
+               then Left  err
+               else Right fileId
+
+toxFileGetFileId :: Tox a -> Word32 -> Word32 -> IO (Either ErrFileGet BS.ByteString)
+toxFileGetFileId = callFileGetFileId tox_file_get_file_id
 
 
 --------------------------------------------------------------------------------
@@ -1114,7 +1344,15 @@ data ErrFileSend
 --   number is per friend. File numbers are reused after a transfer terminates.
 --   On failure, this function returns UINT32_MAX. Any pattern in file numbers
 --   should not be relied on.
-foreign import ccall tox_file_send :: Tox a -> Word32 -> Word32 -> Word64 -> CString -> CString -> CSize -> CErr ErrFileSend -> IO Word32
+foreign import ccall tox_file_send :: Tox a -> Word32 -> CEnum FileKind -> Word64 -> CString -> CString -> CSize -> CErr ErrFileSend -> IO Word32
+callFileSend :: (Tox a -> Word32 -> CEnum FileKind -> Word64 -> CString -> CString -> CSize -> CErr ErrFileSend -> IO Word32) ->
+                Tox a -> Word32 -> FileKind -> Word64 -> String -> IO (Either ErrFileSend Word32)
+callFileSend f tox fn fileKind fileSize fileName =
+  withCStringLen fileName $ \(fileNamePtr, fileNameLen) ->
+    callErrFun $ f tox fn (toCEnum fileKind) fileSize nullPtr fileNamePtr (fromIntegral fileNameLen)
+
+toxFileSend :: Tox a -> Word32 -> FileKind -> Word64 -> String -> IO (Either ErrFileSend Word32)
+toxFileSend = callFileSend tox_file_send
 
 data ErrFileSendChunk
   = ErrFileSendChunkOk
@@ -1167,6 +1405,14 @@ data ErrFileSendChunk
 -- @param position The file or stream position from which to continue reading.
 -- @return true on success.
 foreign import ccall tox_file_send_chunk :: Tox a -> Word32 -> Word32 -> Word64 -> CString -> CSize -> CErr ErrFileSendChunk -> IO Bool
+callFileSendChunk :: (Tox a -> Word32 -> Word32 -> Word64 -> CString -> CSize -> CErr ErrFileSendChunk -> IO Bool) ->
+                Tox a -> Word32 -> Word32 -> Word64 -> BS.ByteString ->  IO (Either ErrFileSendChunk Bool)
+callFileSendChunk f tox fn fileNum pos d =
+  BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
+    callErrFun $ f tox fn fileNum pos dataPtr (fromIntegral dataLen)
+
+toxFileSendChunk :: Tox a -> Word32 -> Word32 -> Word64 -> BS.ByteString -> IO (Either ErrFileSendChunk Bool)
+toxFileSendChunk = callFileSendChunk tox_file_send_chunk
 
 -- | If the length parameter is 0, the file transfer is finished, and the
 -- client's resources associated with the file number should be released. After
@@ -1190,15 +1436,21 @@ foreign import ccall tox_file_send_chunk :: Tox a -> Word32 -> Word32 -> Word64 
 -- @param file_number The file transfer identifier returned by tox_file_send.
 -- @param position The file or stream position from which to continue reading.
 -- @param length The number of bytes requested for the current chunk.
-type FileChunkRequestCb a = Tox a -> Word32 -> Word32 -> Word64 -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFileChunkRequestCb :: FileChunkRequestCb a -> IO (FunPtr (FileChunkRequestCb a))
+type FileChunkRequestCb a = Tox a -> Word32 -> Word32 -> Word64 -> CSize -> a -> IO a
+type CFileChunkRequestCb a = Tox a -> Word32 -> Word32 -> Word64 -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFileChunkRequestCb :: CFileChunkRequestCb a -> IO (FunPtr (CFileChunkRequestCb a))
 
+callFileChunkRequestCb :: FileChunkRequestCb a -> CFileChunkRequestCb a
+callFileChunkRequestCb f tox fn fileNum pos len = deRefStablePtr >=> (`modifyMVar_` f tox fn fileNum pos len)
+
+fileChunkRequestCb :: FileChunkRequestCb a -> IO (FunPtr (CFileChunkRequestCb a))
+fileChunkRequestCb = wrapFileChunkRequestCb . callFileChunkRequestCb
 
 -- | Set the callback for the `file_chunk_request` event. Pass 'nullPtr' to
 -- unset.
 --
 -- This event is triggered when Core is ready to send more file data.
-foreign import ccall tox_callback_file_chunk_request :: Tox a -> FunPtr (FileChunkRequestCb a) -> IO ()
+foreign import ccall tox_callback_file_chunk_request :: Tox a -> FunPtr (CFileChunkRequestCb a) -> IO ()
 
 
 --------------------------------------------------------------------------------
@@ -1224,14 +1476,24 @@ foreign import ccall tox_callback_file_chunk_request :: Tox a -> FunPtr (FileChu
 -- @param filename Name of the file. Does not need to be the actual name. This
 --   name will be sent along with the file send request.
 -- @param filename_length Size in bytes of the filename.
-type FileRecvCb a = Tox a -> Word32 -> Word32 -> Word32 -> Word64 -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFileRecvCb :: FileRecvCb a -> IO (FunPtr (FileRecvCb a))
+type FileRecvCb a = Tox a -> Word32 -> Word32 -> FileKind -> Word64 -> String -> a -> IO a
+type CFileRecvCb a = Tox a -> Word32 -> Word32 -> CEnum FileKind -> Word64 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFileRecvCb :: CFileRecvCb a -> IO (FunPtr (CFileRecvCb a))
+
+callFileRecvCb :: FileRecvCb a -> CFileRecvCb a
+callFileRecvCb f tox fn fileNum fileKind fileSize fileNameStr fileNameLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  fileName <- peekCStringLen (fileNameStr, fromIntegral fileNameLen)
+  modifyMVar_ ud $ f tox fn fileNum (fromCEnum fileKind) fileSize fileName
+
+fileRecvCb :: FileRecvCb a -> IO (FunPtr (CFileRecvCb a))
+fileRecvCb = wrapFileRecvCb . callFileRecvCb
 
 
 -- | Set the callback for the `file_recv` event. Pass 'nullPtr' to unset.
 --
 -- This event is triggered when a file transfer request is received.
-foreign import ccall tox_callback_file_recv :: Tox a -> FunPtr (FileRecvCb a) -> IO ()
+foreign import ccall tox_callback_file_recv :: Tox a -> FunPtr (CFileRecvCb a) -> IO ()
 
 -- | When length is 0, the transfer is finished and the client should release
 -- the resources it acquired for the transfer. After a call with length = 0,
@@ -1247,29 +1509,478 @@ foreign import ccall tox_callback_file_recv :: Tox a -> FunPtr (FileRecvCb a) ->
 -- @param position The file position of the first byte in data.
 -- @param data A byte array containing the received chunk.
 -- @param length The length of the received chunk.
-type FileRecvChunkCb a = Tox a -> Word32 -> Word32 -> Word64 -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFileRecvChunkCb :: FileRecvChunkCb a -> IO (FunPtr (FileRecvChunkCb a))
+type FileRecvChunkCb a = Tox a -> Word32 -> Word32 -> Word64 -> BS.ByteString -> a -> IO a
+type CFileRecvChunkCb a = Tox a -> Word32 -> Word32 -> Word64 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFileRecvChunkCb :: CFileRecvChunkCb a -> IO (FunPtr (CFileRecvChunkCb a))
+
+callFileRecvChunkCb :: FileRecvChunkCb a -> CFileRecvChunkCb a
+callFileRecvChunkCb f tox fn fileNum pos dataPtr dataLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  d <- BS.packCStringLen (dataPtr, fromIntegral dataLen)
+  modifyMVar_ ud $ f tox fn fileNum pos d
+
+fileRecvChunkCb :: FileRecvChunkCb a -> IO (FunPtr (CFileRecvChunkCb a))
+fileRecvChunkCb = wrapFileRecvChunkCb . callFileRecvChunkCb
 
 
 -- | Set the callback for the `file_recv_chunk` event. Pass 'nullPtr' to unset.
 --
 -- This event is first triggered when a file transfer request is received, and
 -- subsequently when a chunk of file data for an accepted request was received.
-foreign import ccall tox_callback_file_recv_chunk :: Tox a -> FunPtr (FileRecvChunkCb a) -> IO ()
+foreign import ccall tox_callback_file_recv_chunk :: Tox a -> FunPtr (CFileRecvChunkCb a) -> IO ()
 
 
 --------------------------------------------------------------------------------
 --
--- :: Group chat management
+-- :: Conference management
 --
 --------------------------------------------------------------------------------
 
 
---------------------------------------------------------------------------------
+-- | Conference types for the conference_invite event.
+data ConferenceType
+  = ConferenceTypeText
+    -- Text-only conferences that must be accepted with the tox_conference_join function.
+
+  | ConferenceTypeAv
+    -- Video conference. The function to accept these is in toxav.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+-- | The invitation will remain valid until the inviting friend goes offline
+-- or exits the conference.
 --
--- :: Group chat message sending and receiving
+-- @param friend_number The friend who invited us.
+-- @param type The conference type (text only or audio/video).
+-- @param cookie A piece of data of variable length required to join the
+--   conference.
+-- @param length The length of the cookie.
+type ConferenceInviteCb a = Tox a -> Word32 -> ConferenceType -> BS.ByteString -> a -> IO a
+type CConferenceInviteCb a = Tox a -> Word32 -> CEnum ConferenceType -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapConferenceInviteCb :: CConferenceInviteCb a -> IO (FunPtr (CConferenceInviteCb a))
+
+callConferenceInviteCb :: ConferenceInviteCb a -> CConferenceInviteCb a
+callConferenceInviteCb f tox fn confType cookiePtr cookieLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  cookie <- BS.packCStringLen (cookiePtr, fromIntegral cookieLen)
+  modifyMVar_ ud $ f tox fn (fromCEnum confType) cookie
+
+conferenceInviteCb :: ConferenceInviteCb a -> IO (FunPtr (CConferenceInviteCb a))
+conferenceInviteCb = wrapConferenceInviteCb . callConferenceInviteCb
+
+
+-- | Set the callback for the `conference_invite` event. Pass NULL to unset.
 --
---------------------------------------------------------------------------------
+-- This event is triggered when the client is invited to join a conference.
+foreign import ccall tox_callback_conference_invite :: Tox a -> FunPtr (CConferenceInviteCb a) -> IO ()
+
+
+-- | @param conference_number The conference number of the conference the message is intended for.
+-- @param peer_number The ID of the peer who sent the message.
+-- @param type The type of message (normal, action, ...).
+-- @param message The message data.
+-- @param length The length of the message.
+type ConferenceMessageCb a = Tox a -> Word32 -> Word32 -> MessageType -> String -> a -> IO a
+type CConferenceMessageCb a = Tox a -> Word32 -> Word32 -> CEnum MessageType -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapConferenceMessageCb :: CConferenceMessageCb a -> IO (FunPtr (CConferenceMessageCb a))
+
+callConferenceMessageCb :: ConferenceMessageCb a -> CConferenceMessageCb a
+callConferenceMessageCb f tox gn pn msgType msgStr msgLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  msg <- peekCStringLen (msgStr, fromIntegral msgLen)
+  modifyMVar_ ud $ f tox gn pn (fromCEnum msgType) msg
+
+conferenceMessageCb :: ConferenceMessageCb a -> IO (FunPtr (CConferenceMessageCb a))
+conferenceMessageCb = wrapConferenceMessageCb . callConferenceMessageCb
+
+
+-- | Set the callback for the `conference_message` event. Pass NULL to unset.
+--
+-- This event is triggered when the client receives a conference message.
+foreign import ccall tox_callback_conference_message :: Tox a -> FunPtr (CConferenceMessageCb a) -> IO ()
+
+
+-- | @param conference_number The conference number of the conference the title change is intended for.
+-- @param peer_number The ID of the peer who changed the title.
+-- @param title The title data.
+-- @param length The title length.
+type ConferenceTitleCb a = Tox a -> Word32 -> Word32 -> String -> a -> IO a
+type CConferenceTitleCb a = Tox a -> Word32 -> Word32 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapConferenceTitleCb :: CConferenceTitleCb a -> IO (FunPtr (CConferenceTitleCb a))
+
+callConferenceTitleCb :: ConferenceTitleCb a -> CConferenceTitleCb a
+callConferenceTitleCb f tox gn pn titleStr titleLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  title <- peekCStringLen (titleStr, fromIntegral titleLen)
+  modifyMVar_ ud $ f tox gn pn title
+
+conferenceTitleCb :: ConferenceTitleCb a -> IO (FunPtr (CConferenceTitleCb a))
+conferenceTitleCb = wrapConferenceTitleCb . callConferenceTitleCb
+
+
+-- | Set the callback for the `conference_title` event. Pass NULL to unset.
+--
+-- This event is triggered when a peer changes the conference title.
+--
+-- If peer_number == UINT32_MAX, then author is unknown (e.g. initial joining the conference).
+foreign import ccall tox_callback_conference_title :: Tox a -> FunPtr (CConferenceTitleCb a) -> IO ()
+
+
+-- | Peer list state change types.
+data ConferenceStateChange
+  = ConferenceStateChangePeerJoin
+    -- A peer has joined the conference.
+
+  | ConferenceStateChangePeerExit
+    -- A peer has exited the conference.
+
+  | ConferenceStateChangePeerNameChange
+    -- A peer has changed their name.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+-- | @param conference_number The conference number of the conference the title change is intended for.
+-- @param peer_number The ID of the peer who changed the title.
+-- @param change The type of change (one of TOX_CONFERENCE_STATE_CHANGE).
+type ConferenceNamelistChangeCb a = Tox a -> Word32 -> Word32 -> ConferenceStateChange -> a -> IO a
+type CConferenceNamelistChangeCb a = Tox a -> Word32 -> Word32 -> CEnum ConferenceStateChange -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapConferenceNamelistChangeCb :: CConferenceNamelistChangeCb a -> IO (FunPtr (CConferenceNamelistChangeCb a))
+
+callConferenceNamelistChangeCb :: ConferenceNamelistChangeCb a -> CConferenceNamelistChangeCb a
+callConferenceNamelistChangeCb f tox gn pn changeType = deRefStablePtr >=> (`modifyMVar_` f tox gn pn (fromCEnum changeType))
+
+conferenceNamelistChangeCb :: ConferenceNamelistChangeCb a -> IO (FunPtr (CConferenceNamelistChangeCb a))
+conferenceNamelistChangeCb = wrapConferenceNamelistChangeCb . callConferenceNamelistChangeCb
+
+
+-- | Set the callback for the `conference_namelist_change` event. Pass NULL to unset.
+--
+-- This event is triggered when the peer list changes (name change, peer join, peer exit).
+foreign import ccall tox_callback_conference_namelist_change :: Tox a -> FunPtr (CConferenceNamelistChangeCb a) -> IO ()
+
+
+data ErrConferenceNew
+  = ErrConferenceNewOk
+    -- The function returned successfully.
+
+  | ErrConferenceNewInit
+    -- The conference instance failed to initialize.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+-- | Creates a new conference.
+--
+-- This function creates a new text conference.
+--
+-- @return conference number on success, or UINT32_MAX on failure.
+foreign import ccall tox_conference_new :: Tox a -> CErr ErrConferenceNew -> IO Word32
+callConferenceNew :: (Tox a -> CErr ErrConferenceNew -> IO Word32) ->
+                     Tox a -> IO (Either ErrConferenceNew Word32)
+callConferenceNew f tox = callErrFun $ f tox
+
+toxConferenceNew :: Tox a -> IO (Either ErrConferenceNew Word32)
+toxConferenceNew = callConferenceNew tox_conference_new
+
+
+data ErrConferenceDelete
+  = ErrConferenceDeleteOk
+    -- The function returned successfully.
+
+  | ErrConferenceDeleteConferenceNotFound
+    -- The conference number passed did not designate a valid conference.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+-- | This function deletes a conference.
+--
+-- @param conference_number The conference number of the conference to be deleted.
+--
+-- @return true on success.
+foreign import ccall tox_conference_delete :: Tox a -> Word32 -> CErr ErrConferenceDelete -> IO Bool
+callConferenceDelete :: (Tox a -> Word32 -> CErr ErrConferenceDelete -> IO Bool) ->
+                        Tox a -> Word32 -> IO (Either ErrConferenceDelete Bool)
+callConferenceDelete f tox gn = callErrFun $ f tox gn
+
+toxConferenceDelete :: Tox a -> Word32 -> IO (Either ErrConferenceDelete Bool)
+toxConferenceDelete = callConferenceDelete tox_conference_delete
+
+
+-- | Error codes for peer info queries.
+data ErrConferencePeerQuery
+  = ErrConferencePeerQueryOk
+    -- The function returned successfully.
+
+  | ErrConferencePeerQueryConferenceNotFound
+    -- The conference number passed did not designate a valid conference.
+
+  | ErrConferencePeerQueryPeerNotFound
+    -- The peer number passed did not designate a valid peer.
+
+  | ErrConferencePeerQueryNoConnection
+    -- The client is not connected to the conference.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+
+-- | Return the number of peers in the conference. Return value is unspecified on failure.
+foreign import ccall tox_conference_peer_count :: Tox a -> Word32 -> CErr ErrConferencePeerQuery -> IO Word32
+callConferencePeerCount :: (Tox a -> Word32 -> CErr ErrConferencePeerQuery -> IO Word32) ->
+                           Tox a -> Word32 -> IO (Either ErrConferencePeerQuery Word32)
+callConferencePeerCount f tox gn = callErrFun $ f tox gn
+
+toxConferencePeerCount :: Tox a -> Word32 -> IO (Either ErrConferencePeerQuery Word32)
+toxConferencePeerCount = callConferencePeerCount tox_conference_peer_count
+
+
+-- | Return the length of the peer's name. Return value is unspecified on failure.
+foreign import ccall tox_conference_peer_get_name_size :: Tox a -> Word32 -> Word32 -> CErr ErrConferencePeerQuery -> IO CSize
+
+
+-- | Copy the name of peer_number who is in conference_number to name.
+-- name must be at least TOX_MAX_NAME_LENGTH long.
+--
+-- @return true on success.
+foreign import ccall tox_conference_peer_get_name :: Tox a -> Word32 -> Word32 -> CString -> CErr ErrConferencePeerQuery -> IO Bool
+
+toxConferencePeerName :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery String)
+toxConferencePeerName tox gn pn = do
+  nameLenRes <- callErrFun $ tox_conference_peer_get_name_size tox gn pn
+  case nameLenRes of
+    Left err -> return $ Left err
+    Right nameLen -> allocaArray (fromIntegral nameLen) $ \namePtr -> do
+      nameRes <- callErrFun $ tox_conference_peer_get_name tox gn pn namePtr
+      case nameRes of
+        Left err -> return $ Left err
+        Right _ -> do
+          name <- peekCStringLen (namePtr, fromIntegral nameLen)
+          return $ Right name
+
+
+-- | Return true if passed peer_number corresponds to our own.
+foreign import ccall tox_conference_peer_number_is_ours :: Tox a -> Word32 -> Word32 -> CErr ErrConferencePeerQuery -> IO Bool
+callConferencePeerNumberIsOurs :: (Tox a -> Word32 -> Word32 -> CErr ErrConferencePeerQuery -> IO Bool) ->
+                                  Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery Bool)
+callConferencePeerNumberIsOurs f tox gn pn = callErrFun $ f tox gn pn
+
+toxConferencePeerNumberIsOurs :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery Bool)
+toxConferencePeerNumberIsOurs = callConferencePeerNumberIsOurs tox_conference_peer_number_is_ours
+
+
+data ErrConferenceInvite
+  = ErrConferenceInviteOk
+    -- The function returned successfully.
+
+  | ErrConferenceInviteConferenceNotFound
+    -- The conference number passed did not designate a valid conference.
+
+  | ErrConferenceInviteFailSend
+    -- The invite packet failed to send.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+
+-- | Invites a friend to a conference.
+--
+-- @param friend_number The friend number of the friend we want to invite.
+-- @param conference_number The conference number of the conference we want to invite the friend to.
+--
+-- @return true on success.
+foreign import ccall tox_conference_invite :: Tox a -> Word32 -> Word32 -> CErr ErrConferenceInvite -> IO Bool
+callConferenceInvite :: (Tox a -> Word32 -> Word32 -> CErr ErrConferenceInvite -> IO Bool) ->
+                        Tox a -> Word32 -> Word32 -> IO (Either ErrConferenceInvite Bool)
+callConferenceInvite f tox fn gn = callErrFun $ f tox fn gn
+
+toxConferenceInvite :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferenceInvite Bool)
+toxConferenceInvite = callConferenceInvite tox_conference_invite
+
+
+data ErrConferenceJoin
+  = ErrConferenceJoinOk
+    -- The function returned successfully.
+
+  | ErrConferenceJoinInvalidLength
+    -- The cookie passed has an invalid length.
+
+  | ErrConferenceJoinWrongType
+    -- The conference is not the expected type. This indicates an invalid cookie.
+
+  | ErrConferenceJoinFriendNotFound
+    -- The friend number passed does not designate a valid friend.
+
+  | ErrConferenceJoinDuplicate
+    -- Client is already in this conference.
+
+  | ErrConferenceJoinInitFail
+    -- Conference instance failed to initialize.
+
+  | ErrConferenceJoinFailSend
+    -- The join packet failed to send.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+
+-- | Joins a conference that the client has been invited to.
+--
+-- @param friend_number The friend number of the friend who sent the invite.
+-- @param cookie Received via the `conference_invite` event.
+-- @param length The size of cookie.
+--
+-- @return conference number on success, UINT32_MAX on failure.
+foreign import ccall tox_conference_join :: Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceJoin -> IO Word32
+callConferenceJoin :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceJoin -> IO Word32) ->
+                        Tox a -> Word32 -> BS.ByteString -> IO (Either ErrConferenceJoin Word32)
+callConferenceJoin f tox fn cookie = do
+  BS.useAsCStringLen cookie $ \(cookiePtr, cookieLen) ->
+    callErrFun $ f tox fn cookiePtr (fromIntegral cookieLen)
+
+toxConferenceJoin :: Tox a -> Word32 -> BS.ByteString -> IO (Either ErrConferenceJoin Word32)
+toxConferenceJoin = callConferenceJoin tox_conference_join
+
+
+data ErrConferenceSendMessage
+  = ErrConferenceSendMessageOk
+    -- The function returned successfully.
+
+  | ErrConferenceSendMessageConferenceNotFound
+    -- The conference number passed did not designate a valid conference.
+
+  | ErrConferenceSendMessageTooLong
+    -- The message is too long.
+
+  | ErrConferenceSendMessageNoConnection
+    -- The client is not connected to the conference.
+
+  | ErrConferenceSendMessageFailSend
+    -- The message packet failed to send.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+
+-- | Send a text chat message to the conference.
+--
+-- This function creates a conference message packet and pushes it into the send
+-- queue.
+--
+-- The message length may not exceed TOX_MAX_MESSAGE_LENGTH. Larger messages
+-- must be split by the client and sent as separate messages. Other clients can
+-- then reassemble the fragments.
+--
+-- @param conference_number The conference number of the conference the message is intended for.
+-- @param type Message type (normal, action, ...).
+-- @param message A non-NULL pointer to the first element of a byte array
+--   containing the message text.
+-- @param length Length of the message to be sent.
+--
+-- @return true on success.
+foreign import ccall tox_conference_send_message :: Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrConferenceSendMessage -> IO Bool
+callConferenceSendMessage :: (Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrConferenceSendMessage -> IO Bool) ->
+                        Tox a -> Word32 -> MessageType -> String -> IO (Either ErrConferenceSendMessage Bool)
+callConferenceSendMessage f tox gn messageType message = do
+  withCStringLen message $ \(msgPtr, msgLen) ->
+    callErrFun $ f tox gn (toCEnum messageType) msgPtr (fromIntegral msgLen)
+
+toxConferenceSendMessage :: Tox a -> Word32 -> MessageType -> String -> IO (Either ErrConferenceSendMessage Bool)
+toxConferenceSendMessage = callConferenceSendMessage tox_conference_send_message
+
+
+data ErrConferenceTitle
+  = ErrConferenceTitleOk
+    -- The function returned successfully.
+
+  | ErrConferenceTitleConferenceNotFound
+    -- The conference number passed did not designate a valid conference.
+
+  | ErrConferenceTitleInvalidLength
+    -- The title is too long or empty.
+
+  | ErrConferenceTitleFailSend
+    -- The title packet failed to send.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+
+-- | Return the length of the conference title. Return value is unspecified on failure.
+--
+-- The return value is equal to the `length` argument received by the last
+-- `conference_title` callback.
+foreign import ccall tox_conference_get_title_size :: Tox a -> Word32 -> CErr ErrConferenceTitle -> IO CSize
+
+
+-- | Write the title designated by the given conference number to a byte array.
+--
+-- Call tox_conference_get_title_size to determine the allocation size for the `title` parameter.
+--
+-- The data written to `title` is equal to the data received by the last
+-- `conference_title` callback.
+--
+-- @param title A valid memory region large enough to store the title.
+--   If this parameter is NULL, this function has no effect.
+--
+-- @return true on success.
+foreign import ccall tox_conference_get_title :: Tox a -> Word32 -> CString -> CErr ErrConferenceTitle -> IO Bool
+
+toxConferenceGetTitle :: Tox a -> Word32 -> IO (Either ErrConferenceTitle String)
+toxConferenceGetTitle tox gn = do
+  titleLenRes <- callErrFun $ tox_conference_get_title_size tox gn
+  case titleLenRes of
+    Left err -> return $ Left err
+    Right titleLen -> allocaArray (fromIntegral titleLen) $ \titlePtr -> do
+      titleRes <- callErrFun $ tox_conference_get_title tox gn titlePtr
+      case titleRes of
+        Left err -> return $ Left err
+        Right _ -> do
+          title <- peekCStringLen (titlePtr, fromIntegral titleLen)
+          return $ Right title
+
+-- | Set the conference title and broadcast it to the rest of the conference.
+--
+-- Title length cannot be longer than TOX_MAX_NAME_LENGTH.
+--
+-- @return true on success.
+foreign import ccall tox_conference_set_title :: Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceTitle -> IO Bool
+callConferenceSetTitle :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceTitle -> IO Bool) ->
+                        Tox a -> Word32 -> String -> IO (Either ErrConferenceTitle Bool)
+callConferenceSetTitle f tox gn title = do
+  withCStringLen title $ \(titlePtr, titleLen) ->
+    callErrFun $ f tox gn titlePtr (fromIntegral titleLen)
+
+toxConferenceSetTitle :: Tox a -> Word32 -> String -> IO (Either ErrConferenceTitle Bool)
+toxConferenceSetTitle = callConferenceSetTitle tox_conference_set_title
+
+
+-- | Return the number of conferences in the Tox instance.
+-- This should be used to determine how much memory to allocate for `tox_conference_get_chatlist`.
+foreign import ccall tox_conference_get_chatlist_size :: Tox a -> IO CSize
+
+
+-- | Copy a list of valid conference IDs into the array chatlist. Determine how much space
+-- to allocate for the array with the `tox_conference_get_chatlist_size` function.
+foreign import ccall tox_conference_get_chatlist :: Tox a -> Ptr Word32 -> IO ()
+
+toxConferenceGetChatlist :: Tox a -> IO [Word32]
+toxConferenceGetChatlist tox = do
+  chatListSize <- tox_conference_get_chatlist_size tox
+  allocaArray (fromIntegral chatListSize) $ \chatListPtr -> do
+    tox_conference_get_chatlist tox chatListPtr
+    peekArray (fromIntegral chatListSize) chatListPtr
+
+-- | Returns the type of conference (TOX_CONFERENCE_TYPE) that conference_number is. Return value is
+-- unspecified on failure.
+data ErrConferenceGetType
+  = ErrConferenceGetTypeOk
+    -- The function returned successfully.
+
+  | ErrConferenceGetTypeConferenceNotFound
+    -- The conference number passed did not designate a valid conference.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+foreign import ccall tox_conference_get_type :: Tox a -> Word32 -> CErr ErrConferenceGetType -> IO (CEnum ConferenceType)
+callConferenceGetType :: (Tox a -> Word32 -> CErr ErrConferenceGetType -> IO (CEnum ConferenceType)) ->
+                         Tox a -> Word32 -> IO (Either ErrConferenceGetType ConferenceType)
+callConferenceGetType f tox gn = callErrFun $ \errPtr -> (f tox gn errPtr) >>= (return . fromCEnum)
+
+toxConferenceGetType :: Tox a -> Word32 -> IO (Either ErrConferenceGetType ConferenceType)
+toxConferenceGetType = callConferenceGetType tox_conference_get_type
 
 
 --------------------------------------------------------------------------------
@@ -1327,6 +2038,14 @@ data ErrFriendCustomPacket
 --
 -- @return true on success.
 foreign import ccall tox_friend_send_lossy_packet :: Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool
+callFriendLossyPacket :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool) ->
+                         Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+callFriendLossyPacket f tox fn d =
+  BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
+    callErrFun $ f tox fn dataPtr (fromIntegral dataLen)
+
+toxFriendLossyPacket :: Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+toxFriendLossyPacket = callFriendLossyPacket tox_friend_send_lossy_packet
 
 -- | Send a custom lossless packet to a friend.
 --
@@ -1343,31 +2062,59 @@ foreign import ccall tox_friend_send_lossy_packet :: Tox a -> Word32 -> CString 
 --
 -- @return true on success.
 foreign import ccall tox_friend_send_lossless_packet :: Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool
+callFriendLoselessPacket :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool) ->
+                         Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+callFriendLoselessPacket f tox fn d =
+  BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
+    callErrFun $ f tox fn dataPtr (fromIntegral dataLen)
+
+toxFriendLoselessPacket :: Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+toxFriendLoselessPacket = callFriendLoselessPacket tox_friend_send_lossless_packet
 
 -- | @param friend_number The friend number of the friend who sent a lossy
 -- packet.
 -- @param data A byte array containing the received packet data.
 -- @param length The length of the packet data byte array.
-type FriendLossyPacketCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendLossyPacketCb :: FriendLossyPacketCb a -> IO (FunPtr (FriendLossyPacketCb a))
+type FriendLossyPacketCb a = Tox a -> Word32 -> BS.ByteString -> a -> IO a
+type CFriendLossyPacketCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendLossyPacketCb :: CFriendLossyPacketCb a -> IO (FunPtr (CFriendLossyPacketCb a))
+
+callFriendLossyPacketCb :: FriendLossyPacketCb a -> CFriendLossyPacketCb a
+callFriendLossyPacketCb f tox fn dataPtr dataLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  d <- BS.packCStringLen (dataPtr, fromIntegral dataLen)
+  modifyMVar_ ud $ f tox fn d
+
+friendLossyPacketCb :: FriendLossyPacketCb a -> IO (FunPtr (CFriendLossyPacketCb a))
+friendLossyPacketCb = wrapFriendLossyPacketCb . callFriendLossyPacketCb
 
 
 -- | Set the callback for the `friend_lossy_packet` event. Pass 'nullPtr' to
 -- unset.
 --
-foreign import ccall tox_callback_friend_lossy_packet :: Tox a -> FunPtr (FriendLossyPacketCb a) -> IO ()
+foreign import ccall tox_callback_friend_lossy_packet :: Tox a -> FunPtr (CFriendLossyPacketCb a) -> IO ()
 
 -- | @param friend_number The friend number of the friend who sent the packet.
 -- @param data A byte array containing the received packet data.
 -- @param length The length of the packet data byte array.
-type FriendLosslessPacketCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapFriendLosslessPacketCb :: FriendLosslessPacketCb a -> IO (FunPtr (FriendLosslessPacketCb a))
+type FriendLosslessPacketCb a = Tox a -> Word32 -> BS.ByteString -> a -> IO a
+type CFriendLosslessPacketCb a = Tox a -> Word32 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapFriendLosslessPacketCb :: CFriendLosslessPacketCb a -> IO (FunPtr (CFriendLosslessPacketCb a))
+
+callFriendLosslessPacketCb :: FriendLosslessPacketCb a -> CFriendLosslessPacketCb a
+callFriendLosslessPacketCb f tox fn dataPtr dataLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  d <- BS.packCStringLen (dataPtr, fromIntegral dataLen)
+  modifyMVar_ ud $ f tox fn d
+
+friendLosslessPacketCb :: FriendLosslessPacketCb a -> IO (FunPtr (CFriendLosslessPacketCb a))
+friendLosslessPacketCb = wrapFriendLosslessPacketCb . callFriendLosslessPacketCb
 
 
 -- | Set the callback for the `friend_lossless_packet` event. Pass 'nullPtr' to
 -- unset.
 --
-foreign import ccall tox_callback_friend_lossless_packet :: Tox a -> FunPtr (FriendLosslessPacketCb a) -> IO ()
+foreign import ccall tox_callback_friend_lossless_packet :: Tox a -> FunPtr (CFriendLosslessPacketCb a) -> IO ()
 
 
 --------------------------------------------------------------------------------
@@ -1390,6 +2137,13 @@ foreign import ccall tox_callback_friend_lossless_packet :: Tox a -> FunPtr (Fri
 --   this parameter is 'nullPtr', this function has no effect.
 foreign import ccall tox_self_get_dht_id :: Tox a -> CString -> IO ()
 
+toxSelfGetDhtId :: Tox a -> IO BS.ByteString
+toxSelfGetDhtId tox =
+  let idLen = fromIntegral tox_public_key_size in
+  allocaArray idLen $ \idPtr -> do
+    tox_self_get_dht_id tox idPtr
+    BS.packCStringLen (idPtr, idLen)
+
 data ErrGetPort
   = ErrGetPortOk
     -- The function returned successfully.
@@ -1401,7 +2155,19 @@ data ErrGetPort
 
 -- | Return the UDP port this Tox instance is bound to.
 foreign import ccall tox_self_get_udp_port :: Tox a -> CErr ErrGetPort -> IO Word16
+callSelfGetUdpPort :: (Tox a -> CErr ErrGetPort -> IO Word16) ->
+                        Tox a -> IO (Either ErrGetPort Word16)
+callSelfGetUdpPort f tox = callErrFun $ f tox
+
+toxSelfGetUdpPort :: Tox a -> IO (Either ErrGetPort Word16)
+toxSelfGetUdpPort = callSelfGetUdpPort tox_self_get_udp_port
 
 -- | Return the TCP port this Tox instance is bound to. This is only relevant if
 -- the instance is acting as a TCP relay.
 foreign import ccall tox_self_get_tcp_port :: Tox a -> CErr ErrGetPort -> IO Word16
+callSelfGetTcpPort :: (Tox a -> CErr ErrGetPort -> IO Word16) ->
+                        Tox a -> IO (Either ErrGetPort Word16)
+callSelfGetTcpPort f tox = callErrFun $ f tox
+
+toxSelfGetTcpPort :: Tox a -> IO (Either ErrGetPort Word16)
+toxSelfGetTcpPort = callSelfGetTcpPort tox_self_get_udp_port
