@@ -1,15 +1,20 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Main (main) where
 
+import           Prelude hiding          (catch)
+import           System.Exit             (exitSuccess)
+import           System.Directory        (doesFileExist)
+import           Control.Exception       (catch, throwIO, AsyncException(UserInterrupt))
 import           Control.Applicative     ((<$>))
 import           Control.Concurrent      (threadDelay)
 import           Control.Concurrent.MVar (MVar, newMVar, putMVar, readMVar,
-                                          takeMVar)
+                                          takeMVar, modifyMVar_)
 import           Control.Exception       (bracket)
-import           Control.Monad           (replicateM_, when)
-import qualified Data.ByteString         as BS
+import           Control.Monad           (replicateM_, when, forever)
+import qualified Data.ByteString.Char8   as BS
 import qualified Data.ByteString.Base16  as Base16
 import           Data.String             (fromString)
+import           Data.Word               (Word32)
 import           Foreign.Marshal.Alloc   (alloca)
 import           Foreign.Marshal.Utils   (with)
 import           Foreign.Ptr             (freeHaskellFunPtr, nullPtr)
@@ -25,12 +30,20 @@ bootstrapKey =
   fst . Base16.decode . fromString $
     "F404ABAA1C99A9D37D61AB54898F56793E1DEF8BD46B1038B9D822E8460FAB67"
 
+isMasterKey :: BS.ByteString -> Bool
+isMasterKey key = (key==) . fst . Base16.decode . fromString $
+    "040F75B5C8995F9525F9A8692A6C355286BBD3CF248C984560733421274F0365"
+
+botName :: String
+botName = "groupbot"
+
 bootstrapHost :: String
 bootstrapHost = "biribiri.org"
 
+savedataFilename = "groupbot.tox"
 
-options :: C.Options
-options = C.Options
+options :: BS.ByteString -> C.Options
+options savedata = C.Options
   { C.ipv6Enabled  = True
   , C.udpEnabled   = True
   , C.proxyType    = C.ProxyTypeNone
@@ -39,8 +52,8 @@ options = C.Options
   , C.startPort    = 33445
   , C.endPort      = 33545
   , C.tcpPort      = 3128
-  , C.savedataType = C.SavedataTypeNone
-  , C.savedataData = BS.empty
+  , C.savedataType = if savedata == BS.empty then C.SavedataTypeNone else C.SavedataTypeToxSave
+  , C.savedataData = savedata
   }
 
 
@@ -59,37 +72,82 @@ must :: Show a => IO (Either a b) -> IO b
 must = (getRight =<<)
 
 
-newtype UserData = UserData Int
+newtype UserData = UserData Word32
   deriving (Eq, Storable, Read, Show)
 
 instance C.CHandler UserData where
   cSelfConnectionStatus _ conn ud = do
+    putStrLn "SelfConnectionStatusCb"
     print conn
-    print ud
-    return $ UserData 4321
+    return $ ud
+
+  cFriendRequest tox pk msg ud = do
+    putStrLn "FriendRequestCb"
+    Right fn <- C.toxFriendAddNorequest tox pk
+    putStrLn $ (BS.unpack . Base16.encode) pk
+    putStrLn msg
+    print fn
+    return $ ud
+
+  cFriendConnectionStatus tox fn status ud@(UserData gn) = do
+    putStrLn "FriendConnectionStatusCb"
+    print fn
+    print status
+    if status /= C.ConnectionNone
+    then do
+      putStrLn "Inviting!"
+      _ <- C.toxConferenceInvite tox fn gn
+      return ()
+    else
+      putStrLn "Friend offline"
+    return $ ud
+
+  cFriendMessage tox fn msgType msg ud = do
+    putStrLn "FriendMessage"
+    print fn
+    print msgType
+    putStrLn msg
+    _ <- C.toxFriendSendMessage tox fn msgType msg
+    return $ ud
+
+  cConferenceInvite tox fn confType cookie ud = do
+    putStrLn "ConferenceInvite"
+    print fn
+    pk <- getRight =<< (C.toxFriendGetPublicKey tox fn)
+    if isMasterKey pk
+    then do
+      putStrLn "Joining!"
+      gn <- getRight =<< C.toxConferenceJoin tox fn cookie
+      return $ UserData gn
+    else do
+      putStrLn "Not master!"
+      return $ ud
 
 
-withStablePtr :: a -> (StablePtr a -> IO b) -> IO b
-withStablePtr x = bracket (newStablePtr x) freeStablePtr
-
-
-toxIterate :: MVar a -> C.Tox a -> IO ()
-toxIterate ud tox =
-  withStablePtr ud (C.tox_iterate tox)
+loop ud tox = forever $ do
+                C.toxIterate tox ud
+                interval <- C.tox_iteration_interval tox
+                threadDelay $ fromIntegral $ interval * 10000
 
 
 main :: IO ()
-main =
-  must $ C.withOptions options $ \optPtr ->
+main = do
+  exists <- doesFileExist savedataFilename
+  savedata <- if exists then (BS.readFile savedataFilename) else (return BS.empty)
+  must $ C.withOptions (options savedata) $ \optPtr ->
     must $ C.withTox optPtr $ \tox -> do
       must $ C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
-      must $ C.toxAddTcpRelay tox bootstrapHost 33445 bootstrapKey
 
       C.withCHandler tox $ do
-        ud <- newMVar (UserData 1234)
-        while ((/= UserData 4321) <$> readMVar ud) $ do
-          toxIterate ud tox
-          putStrLn "tox_iterate"
-          interval <- C.tox_iteration_interval tox
-          threadDelay $ fromIntegral $ interval * 10000
-        putStrLn "done"
+        adr <- C.toxSelfGetAddress tox
+        putStrLn $ (BS.unpack . Base16.encode) adr
+        _ <- C.toxSelfSetName tox botName
+        gn <- getRight =<< C.toxConferenceNew tox
+        ud <- newMVar (UserData gn)
+        catch (loop ud tox) $ \e ->
+            if e == UserInterrupt
+            then do
+              savedata <- C.toxGetSavedata tox
+              BS.writeFile savedataFilename savedata
+              exitSuccess
+            else throwIO e

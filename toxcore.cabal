@@ -53,6 +53,7 @@ executable groupbot
       base < 5
     , base16-bytestring
     , bytestring
+    , directory
     , toxcore
   main-is: groupbot.hs
 

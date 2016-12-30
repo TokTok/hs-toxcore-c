@@ -81,7 +81,7 @@
 module Network.Tox.C.Tox where
 
 import           Control.Applicative     ((<$>))
-import           Control.Concurrent.MVar (modifyMVar_)
+import           Control.Concurrent.MVar (modifyMVar_, MVar)
 import           Control.Exception       (bracket)
 import           Control.Monad           ((>=>))
 import qualified Data.ByteString         as BS
@@ -91,7 +91,7 @@ import           Foreign.C.Types         (CInt (..), CSize (..))
 import           Foreign.Marshal.Alloc   (alloca)
 import           Foreign.Marshal.Array   (allocaArray, peekArray)
 import           Foreign.Ptr             (FunPtr, Ptr, nullPtr)
-import           Foreign.StablePtr       (deRefStablePtr)
+import           Foreign.StablePtr       (deRefStablePtr, freeStablePtr, newStablePtr)
 import           Foreign.Storable        (peek)
 
 import           Network.Tox.C.CEnum
@@ -366,8 +366,8 @@ toxIterationInterval = tox_iteration_interval
 -- | The main loop that needs to be run in intervals of tox_iteration_interval()
 -- milliseconds.
 foreign import ccall tox_iterate :: Tox a -> UserData a -> IO ()
-toxIterate :: Tox a -> UserData a -> IO ()
-toxIterate = tox_iterate
+toxIterate :: Tox a -> MVar a -> IO ()
+toxIterate tox ud = bracket (newStablePtr ud) freeStablePtr (tox_iterate tox)
 
 
 --------------------------------------------------------------------------------
