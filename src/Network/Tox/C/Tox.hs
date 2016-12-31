@@ -87,12 +87,13 @@ import           Control.Monad           ((>=>))
 import qualified Data.ByteString         as BS
 import           Data.Word               (Word16, Word32, Word64)
 import           Foreign.C.String        (CString, withCString, withCStringLen, peekCStringLen)
-import           Foreign.C.Types         (CInt (..), CSize (..))
+import           Foreign.C.Types         (CInt (..), CSize (..), CTime (..))
 import           Foreign.Marshal.Alloc   (alloca)
 import           Foreign.Marshal.Array   (allocaArray, peekArray)
 import           Foreign.Ptr             (FunPtr, Ptr, nullPtr)
 import           Foreign.StablePtr       (deRefStablePtr, freeStablePtr, newStablePtr)
 import           Foreign.Storable        (peek)
+import           System.Posix.Types      (EpochTime)
 
 import           Network.Tox.C.CEnum
 import           Network.Tox.C.Constants
@@ -475,6 +476,34 @@ toxSelfSetName :: Tox a -> String -> IO (Either ErrSetInfo ())
 toxSelfSetName = callSelfSetNameFun tox_self_set_name
 
 
+-- | Return the length of the current nickname as passed to tox_self_set_name.
+--
+-- If no nickname was set before calling this function, the name is empty,
+-- and this function returns 0.
+--
+-- @see threading for concurrency implications.
+foreign import ccall tox_self_get_name_size :: Tox a -> IO CSize
+
+-- | Write the nickname set by tox_self_set_name to a byte array.
+--
+-- If no nickname was set before calling this function, the name is empty,
+-- and this function has no effect.
+--
+-- Call tox_self_get_name_size to find out how much memory to allocate for
+-- the result.
+--
+-- @param name A valid memory location large enough to hold the nickname.
+--   If this parameter is NULL, the function has no effect.
+foreign import ccall tox_self_get_name :: Tox a -> CString -> IO ()
+
+toxSelfGetName :: Tox a -> IO String
+toxSelfGetName tox = do
+  nameLen <- tox_self_get_name_size tox
+  allocaArray (fromIntegral nameLen) $ \namePtr -> do
+    tox_self_get_name tox namePtr
+    peekCStringLen (namePtr, fromIntegral nameLen)
+
+
 -- | Set the client's status message.
 --
 -- Status message length cannot exceed 'tox_max_status_message_length'. If
@@ -489,6 +518,36 @@ callSelfSetStatusMessageFun f tox statusMsg =
 
 toxSelfSetStatusMessage :: Tox a -> String -> IO (Either ErrSetInfo ())
 toxSelfSetStatusMessage = callSelfSetStatusMessageFun tox_self_set_status_message
+
+
+-- | Return the length of the current status message as passed to tox_self_set_status_message.
+--
+-- If no status message was set before calling this function, the status
+-- is empty, and this function returns 0.
+--
+-- @see threading for concurrency implications.
+foreign import ccall tox_self_get_status_message_size :: Tox a -> IO CSize
+
+
+-- | Write the status message set by tox_self_set_status_message to a byte array.
+--
+-- If no status message was set before calling this function, the status is
+-- empty, and this function has no effect.
+--
+-- Call tox_self_get_status_message_size to find out how much memory to allocate for
+-- the result.
+--
+-- @param status_message A valid memory location large enough to hold the
+--   status message. If this parameter is NULL, the function has no effect.
+foreign import ccall tox_self_get_status_message :: Tox a -> CString -> IO ()
+
+toxSelfGetStatusMessage :: Tox a -> IO String
+toxSelfGetStatusMessage tox = do
+  statusMessageLen <- tox_self_get_status_message_size tox
+  allocaArray (fromIntegral statusMessageLen) $ \statusMessagePtr -> do
+    tox_self_get_status_message tox statusMessagePtr
+    peekCStringLen (statusMessagePtr, fromIntegral statusMessageLen)
+
 
 -- | Set the client's user status.
 --
@@ -720,11 +779,83 @@ toxFriendGetPublicKey :: Tox a -> Word32 -> IO (Either ErrFriendGetPublicKey BS.
 toxFriendGetPublicKey = callFriendGetPublicKey tox_friend_get_public_key
 
 
+data ErrFriendGetLastOnline
+  = ErrFriendGetLastOnlineOk
+    -- The function returned successfully.
+
+  | ErrFriendGetLastOnlineFriendNotFound
+    -- No friend with the given number exists on the friend list.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+-- | Return a unix-time timestamp of the last time the friend associated with a given
+-- friend number was seen online. This function will return UINT64_MAX on error.
+--
+-- @param friend_number The friend number you want to query.
+foreign import ccall tox_friend_get_last_online :: Tox a -> Word32 -> CErr ErrFriendGetLastOnline -> IO Word64
+callFriendGetLastOnline :: (Tox a -> Word32 -> CErr ErrFriendGetLastOnline -> IO Word64) ->
+                           Tox a -> Word32 -> IO (Either ErrFriendGetLastOnline EpochTime)
+callFriendGetLastOnline f tox fn = callErrFun $ \errPtr -> (f tox fn errPtr) >>= (return . CTime . fromIntegral)
+
+toxFriendGetLastOnline :: Tox a -> Word32 -> IO (Either ErrFriendGetLastOnline EpochTime)
+toxFriendGetLastOnline = callFriendGetLastOnline tox_friend_get_last_online
+
+
 --------------------------------------------------------------------------------
 --
 -- :: Friend-specific state queries (can also be received through callbacks)
 --
 --------------------------------------------------------------------------------
+
+
+-- | Common error codes for friend state query functions.
+data ErrFriendQuery
+  = ErrFriendQueryOk
+    -- The function returned successfully.
+
+  | ErrFriendQueryNull
+    -- The pointer parameter for storing the query result (name, message) was
+    -- NULL. Unlike the `_self_` variants of these functions, which have no effect
+    -- when a parameter is NULL, these functions return an error in that case.
+
+  | ErrFriendQueryFriendNotFound
+    -- The friend_number did not designate a valid friend.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+
+-- | Return the length of the friend's name. If the friend number is invalid, the
+-- return value is unspecified.
+--
+-- The return value is equal to the `length` argument received by the last
+-- `friend_name` callback.
+foreign import ccall tox_friend_get_name_size :: Tox a -> Word32 -> CErr ErrFriendQuery -> IO CSize
+
+-- | Write the name of the friend designated by the given friend number to a byte
+-- array.
+--
+-- Call tox_friend_get_name_size to determine the allocation size for the `name`
+-- parameter.
+--
+-- The data written to `name` is equal to the data received by the last
+-- `friend_name` callback.
+--
+-- @param name A valid memory region large enough to store the friend's name.
+--
+-- @return true on success.
+foreign import ccall tox_friend_get_name :: Tox a -> Word32 -> CString -> CErr ErrFriendQuery -> IO Bool
+
+toxFriendGetName :: Tox a -> Word32 -> IO (Either ErrFriendQuery String)
+toxFriendGetName tox fn = do
+  nameLenRes <- callErrFun $ tox_friend_get_name_size tox fn
+  case nameLenRes of
+    Left err -> return $ Left err
+    Right nameLen -> allocaArray (fromIntegral nameLen) $ \namePtr -> do
+      nameRes <- callErrFun $ tox_friend_get_name tox fn namePtr
+      case nameRes of
+        Left err -> return $ Left err
+        Right _ -> do
+          name <- peekCStringLen (namePtr, fromIntegral nameLen)
+          return $ Right name
 
 
 -- | @param friend_number The friend number of the friend whose name changed.
@@ -773,6 +904,36 @@ friendStatusMessageCb :: FriendStatusMessageCb a -> IO (FunPtr (CFriendStatusMes
 friendStatusMessageCb = wrapFriendStatusMessageCb . callFriendStatusMessageCb
 
 
+-- | Return the length of the friend's status message. If the friend number is
+-- invalid, the return value is SIZE_MAX.
+foreign import ccall tox_friend_get_status_message_size :: Tox a -> Word32 -> CErr ErrFriendQuery -> IO CSize
+
+-- | Write the status message of the friend designated by the given friend number to a byte
+-- array.
+--
+-- Call tox_friend_get_status_message_size to determine the allocation size for the `status_name`
+-- parameter.
+--
+-- The data written to `status_message` is equal to the data received by the last
+-- `friend_status_message` callback.
+--
+-- @param status_message A valid memory region large enough to store the friend's status message.
+foreign import ccall tox_friend_get_status_message :: Tox a -> Word32 -> CString -> CErr ErrFriendQuery -> IO Bool
+
+toxFriendGetStatusMessage :: Tox a -> Word32 -> IO (Either ErrFriendQuery String)
+toxFriendGetStatusMessage tox fn = do
+  statusMessageLenRes <- callErrFun $ tox_friend_get_status_message_size tox fn
+  case statusMessageLenRes of
+    Left err -> return $ Left err
+    Right statusMessageLen -> allocaArray (fromIntegral statusMessageLen) $ \statusMessagePtr -> do
+      statusMessageRes <- callErrFun $ tox_friend_get_status_message tox fn statusMessagePtr
+      case statusMessageRes of
+        Left err -> return $ Left err
+        Right _ -> do
+          statusMessage <- peekCStringLen (statusMessagePtr, fromIntegral statusMessageLen)
+          return $ Right statusMessage
+
+
 -- | Set the callback for the `friend_status_message` event. Pass 'nullPtr' to
 -- unset.
 --
@@ -800,6 +961,26 @@ friendStatusCb = wrapFriendStatusCb . callFriendStatusCb
 foreign import ccall tox_callback_friend_status :: Tox a -> FunPtr (CFriendStatusCb a) -> IO ()
 
 
+-- | Check whether a friend is currently connected to this client.
+--
+-- The result of this function is equal to the last value received by the
+-- `friend_connection_status` callback.
+--
+-- @param friend_number The friend number for which to query the connection
+--   status.
+--
+-- @return the friend's connection status as it was received through the
+--   `friend_connection_status` event.
+foreign import ccall tox_friend_get_connection_status :: Tox a -> Word32 -> CErr ErrFriendQuery -> IO (CEnum Connection)
+
+callFriendGetConnectionStatus :: (Tox a -> Word32 -> CErr ErrFriendQuery -> IO (CEnum Connection)) ->
+                                 Tox a -> Word32 -> IO (Either ErrFriendQuery Connection)
+callFriendGetConnectionStatus f tox fn = callErrFun $ \errPtr -> (f tox fn errPtr) >>= (return . fromCEnum)
+
+toxFriendGetConnectionStatus :: Tox a -> Word32 -> IO (Either ErrFriendQuery Connection)
+toxFriendGetConnectionStatus = callFriendGetConnectionStatus tox_friend_get_connection_status
+
+
 -- | @param friend_number The friend number of the friend whose connection
 --   status changed.
 -- @param connection_status The result of calling
@@ -824,6 +1005,23 @@ friendConnectionStatusCb = wrapFriendConnectionStatusCb . callFriendConnectionSt
 -- This callback is not called when adding friends. It is assumed that when
 -- adding friends, their connection status is initially offline.
 foreign import ccall tox_callback_friend_connection_status :: Tox a -> FunPtr (CFriendConnectionStatusCb a) -> IO ()
+
+
+-- | Check whether a friend is currently typing a message.
+--
+-- @param friend_number The friend number for which to query the typing status.
+--
+-- @return true if the friend is typing.
+-- @return false if the friend is not typing, or the friend number was
+--   invalid. Inspect the error code to determine which case it is.
+foreign import ccall tox_friend_get_typing :: Tox a -> Word32 -> CErr ErrFriendQuery -> IO Bool
+
+callFriendGetTyping :: (Tox a -> Word32 -> CErr ErrFriendQuery -> IO Bool) ->
+                       Tox a -> Word32 -> IO (Either ErrFriendQuery Bool)
+callFriendGetTyping f tox fn = callErrFun $ f tox fn
+
+toxFriendGetTyping :: Tox a -> Word32 -> IO (Either ErrFriendQuery Bool)
+toxFriendGetTyping = callFriendGetTyping tox_friend_get_typing
 
 
 -- | @param friend_number The friend number of the friend who started or stopped
@@ -1742,8 +1940,8 @@ foreign import ccall tox_conference_peer_get_name_size :: Tox a -> Word32 -> Wor
 -- @return true on success.
 foreign import ccall tox_conference_peer_get_name :: Tox a -> Word32 -> Word32 -> CString -> CErr ErrConferencePeerQuery -> IO Bool
 
-toxConferencePeerName :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery String)
-toxConferencePeerName tox gn pn = do
+toxConferencePeerGetName :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery String)
+toxConferencePeerGetName tox gn pn = do
   nameLenRes <- callErrFun $ tox_conference_peer_get_name_size tox gn pn
   case nameLenRes of
     Left err -> return $ Left err
@@ -1754,6 +1952,28 @@ toxConferencePeerName tox gn pn = do
         Right _ -> do
           name <- peekCStringLen (namePtr, fromIntegral nameLen)
           return $ Right name
+
+
+-- | Copy the public key of peer_number who is in conference_number to public_key.
+-- public_key must be TOX_PUBLIC_KEY_SIZE long.
+--
+-- @return true on success.
+foreign import ccall tox_conference_peer_get_public_key :: Tox a -> Word32 -> Word32 -> CString -> CErr ErrConferencePeerQuery -> IO Bool
+callConferencePeerGetPublicKey :: (Tox a -> Word32 -> Word32 -> CString -> CErr ErrConferencePeerQuery -> IO Bool) ->
+                          Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
+callConferencePeerGetPublicKey f tox gn pn =
+  let pkLen = fromIntegral tox_public_key_size in
+  alloca $ \errPtr -> do
+    allocaArray pkLen $ \pkPtr -> do
+      _ <- f tox gn pn pkPtr errPtr
+      err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
+      str <- BS.packCStringLen (pkPtr, pkLen)
+      return $ if err /= minBound
+               then Left  err
+               else Right str
+
+toxConferencePeerGetPublicKey :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
+toxConferencePeerGetPublicKey = callConferencePeerGetPublicKey tox_conference_peer_get_public_key
 
 
 -- | Return true if passed peer_number corresponds to our own.
