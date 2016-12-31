@@ -31,3 +31,10 @@ after_script:
   - TESTSUITE=toxcore-0.0.2
   - cp dist/hpc/mix/testsuite/*.mix dist/hpc/mix/$TESTSUITE/
   - hpc-coveralls $TESTSUITE
+
+branches:
+  only:
+  - master
+
+git:
+  depth: 1
