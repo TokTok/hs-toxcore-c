@@ -1,18 +1,17 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 module Main (main) where
 
-import           Prelude hiding          (catch)
-import           System.Exit             (exitSuccess)
-import           System.Directory        (doesFileExist)
-import           Control.Exception       (catch, throwIO, AsyncException(UserInterrupt))
 import           Control.Applicative     ((<$>))
 import           Control.Concurrent      (threadDelay)
-import           Control.Concurrent.MVar (MVar, newMVar, putMVar, readMVar,
-                                          takeMVar, modifyMVar_)
+import           Control.Concurrent.MVar (MVar, modifyMVar_, newMVar, putMVar,
+                                          readMVar, takeMVar)
+import           Control.Exception       (AsyncException (UserInterrupt), catch,
+                                          throwIO)
 import           Control.Exception       (bracket)
-import           Control.Monad           (replicateM_, when, forever)
-import qualified Data.ByteString.Char8   as BS
+import           Control.Monad           (forever, replicateM_, when)
 import qualified Data.ByteString.Base16  as Base16
+import qualified Data.ByteString.Char8   as BS
 import           Data.String             (fromString)
 import           Data.Word               (Word32)
 import           Foreign.Marshal.Alloc   (alloca)
@@ -21,6 +20,8 @@ import           Foreign.Ptr             (freeHaskellFunPtr, nullPtr)
 import           Foreign.StablePtr       (StablePtr, deRefStablePtr,
                                           freeStablePtr, newStablePtr)
 import           Foreign.Storable        (Storable (..))
+import           System.Directory        (doesFileExist)
+import           System.Exit             (exitSuccess)
 
 import qualified Network.Tox.C           as C
 
@@ -31,7 +32,8 @@ bootstrapKey =
     "F404ABAA1C99A9D37D61AB54898F56793E1DEF8BD46B1038B9D822E8460FAB67"
 
 isMasterKey :: BS.ByteString -> Bool
-isMasterKey key = (key==) . fst . Base16.decode . fromString $
+isMasterKey key =
+  (key ==) . fst . Base16.decode . fromString $
     "040F75B5C8995F9525F9A8692A6C355286BBD3CF248C984560733421274F0365"
 
 botName :: String
@@ -40,6 +42,7 @@ botName = "groupbot"
 bootstrapHost :: String
 bootstrapHost = "biribiri.org"
 
+savedataFilename :: String
 savedataFilename = "groupbot.tox"
 
 options :: BS.ByteString -> C.Options
@@ -55,12 +58,6 @@ options savedata = C.Options
   , C.savedataType = if savedata == BS.empty then C.SavedataTypeNone else C.SavedataTypeToxSave
   , C.savedataData = savedata
   }
-
-
-while :: IO Bool -> IO () -> IO ()
-while cond io = do
-  continue <- cond
-  when continue $ io >> while cond io
 
 
 getRight :: (Monad m, Show a) => Either a b -> m b
@@ -87,7 +84,7 @@ instance C.CHandler UserData where
     putStrLn $ (BS.unpack . Base16.encode) pk
     putStrLn msg
     print fn
-    return $ ud
+    return ud
 
   cFriendConnectionStatus tox fn status ud@(UserData gn) = do
     putStrLn "FriendConnectionStatusCb"
@@ -100,7 +97,7 @@ instance C.CHandler UserData where
       return ()
     else
       putStrLn "Friend offline"
-    return $ ud
+    return ud
 
   cFriendMessage tox fn msgType msg ud = do
     putStrLn "FriendMessage"
@@ -108,9 +105,9 @@ instance C.CHandler UserData where
     print msgType
     putStrLn msg
     _ <- C.toxFriendSendMessage tox fn msgType msg
-    return $ ud
+    return ud
 
-  cConferenceInvite tox fn confType cookie ud = do
+  cConferenceInvite tox fn _confType cookie ud = do
     putStrLn "ConferenceInvite"
     print fn
     pk <- getRight =<< (C.toxFriendGetPublicKey tox fn)
@@ -121,22 +118,24 @@ instance C.CHandler UserData where
       return $ UserData gn
     else do
       putStrLn "Not master!"
-      return $ ud
+      return ud
 
 
-loop ud tox = forever $ do
-                C.toxIterate tox ud
-                interval <- C.tox_iteration_interval tox
-                threadDelay $ fromIntegral $ interval * 10000
+loop :: MVar ud -> C.Tox ud -> IO a
+loop ud tox =
+  forever $ do
+    C.toxIterate tox ud
+    interval <- C.tox_iteration_interval tox
+    threadDelay $ fromIntegral $ interval * 10000
 
 
 main :: IO ()
 main = do
   exists <- doesFileExist savedataFilename
-  savedata <- if exists then (BS.readFile savedataFilename) else (return BS.empty)
-  must $ C.withOptions (options savedata) $ \optPtr ->
+  loadedSavedata <- if exists then BS.readFile savedataFilename else return BS.empty
+  must $ C.withOptions (options loadedSavedata) $ \optPtr ->
     must $ C.withTox optPtr $ \tox -> do
-      must $ C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
+      must $ C.toxBootstrap tox bootstrapHost 33445 bootstrapKey
 
       C.withCHandler tox $ do
         adr <- C.toxSelfGetAddress tox
@@ -144,10 +143,9 @@ main = do
         _ <- C.toxSelfSetName tox botName
         gn <- getRight =<< C.toxConferenceNew tox
         ud <- newMVar (UserData gn)
-        catch (loop ud tox) $ \e ->
-            if e == UserInterrupt
-            then do
-              savedata <- C.toxGetSavedata tox
-              BS.writeFile savedataFilename savedata
-              exitSuccess
-            else throwIO e
+        catch (loop ud tox) $ \case
+          e@UserInterrupt -> throwIO e
+          _ -> do
+            savedSavedata <- C.toxGetSavedata tox
+            BS.writeFile savedataFilename savedSavedata
+            exitSuccess
