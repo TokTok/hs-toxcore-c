@@ -81,17 +81,19 @@
 module Network.Tox.C.Tox where
 
 import           Control.Applicative     ((<$>))
-import           Control.Concurrent.MVar (modifyMVar_, MVar)
+import           Control.Concurrent.MVar (MVar, modifyMVar_)
 import           Control.Exception       (bracket)
 import           Control.Monad           ((>=>))
 import qualified Data.ByteString         as BS
 import           Data.Word               (Word16, Word32, Word64)
-import           Foreign.C.String        (CString, withCString, withCStringLen, peekCStringLen)
+import           Foreign.C.String        (CString, peekCStringLen, withCString,
+                                          withCStringLen)
 import           Foreign.C.Types         (CInt (..), CSize (..), CTime (..))
 import           Foreign.Marshal.Alloc   (alloca)
 import           Foreign.Marshal.Array   (allocaArray, peekArray)
 import           Foreign.Ptr             (FunPtr, Ptr, nullPtr)
-import           Foreign.StablePtr       (deRefStablePtr, freeStablePtr, newStablePtr)
+import           Foreign.StablePtr       (deRefStablePtr, freeStablePtr,
+                                          newStablePtr)
 import           Foreign.Storable        (peek)
 import           System.Posix.Types      (EpochTime)
 
