@@ -1,5 +1,6 @@
 # Build products.
 /dist
+/src/Network/Tox/C/Tox_stub.h
 /*.tix
 /.*.pid
 /.*.stamp
