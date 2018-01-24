@@ -3,35 +3,31 @@ ghc: 7.8
 
 cache:
   directories:
-    - $HOME/.cabal
-    - $HOME/.ghc
+  - $HOME/.cabal
+  - $HOME/.ghc
 
 install:
-  - export CABAL_FLAGS="--enable-tests --enable-benchmarks --extra-include-dirs=$HOME/.ghc/usr/include --extra-lib-dirs=$HOME/.ghc/usr/lib"
-  # Install a recent version of happy, so other dependencies can be installed.
-  - cabal install happy
-  - cabal install hpc-coveralls "aeson < 0.11"
-  # Where to find libraries.
-  - export LD_LIBRARY_PATH=$HOME/.ghc/usr/lib
-  - export PKG_CONFIG_PATH=$HOME/.ghc/usr/lib/pkgconfig
-  # c-sodium
-  - git clone --depth=1 --branch=stable https://github.com/jedisct1/libsodium
-  - (cd libsodium && ./configure --prefix=$HOME/.ghc/usr && make install -j$(nproc))
-  # c-toxcore
-  - git clone --depth=1 https://github.com/TokTok/c-toxcore
-  - (cd c-toxcore && cmake -B_build -H. -DCMAKE_INSTALL_PREFIX:PATH=$HOME/.ghc/usr -DBUILD_TOXAV=0 && make -C_build install -j$(nproc))
-  - cabal install --only-dependencies $CABAL_FLAGS
+- export CABAL_FLAGS="--enable-tests --enable-benchmarks --extra-include-dirs=$HOME/.ghc/usr/include --extra-lib-dirs=$HOME/.ghc/usr/lib"
+# Install a recent version of happy, so other dependencies can be installed.
+- cabal install happy
+- cabal install hpc-coveralls "aeson < 0.11"
+# Where to find libraries.
+- export LD_LIBRARY_PATH=$HOME/.ghc/usr/lib
+- export PKG_CONFIG_PATH=$HOME/.ghc/usr/lib/pkgconfig
+# c-sodium
+- git clone --depth=1 --branch=stable https://github.com/jedisct1/libsodium
+- test -f $HOME/.ghc/usr/lib/libsodium.so || (cd libsodium && ./configure --prefix=$HOME/.ghc/usr && make install -j$(nproc))
+# c-toxcore
+- git clone --depth=1 https://github.com/TokTok/c-toxcore
+- test -f $HOME/.ghc/usr/lib/libtoxcore.so || (cd c-toxcore && cmake -B_build -H. -DCMAKE_INSTALL_PREFIX:PATH=$HOME/.ghc/usr -DBUILD_TOXAV=0 && make -C_build install -j$(nproc))
+- cabal install --only-dependencies $CABAL_FLAGS
 
 script:
-  - cabal configure --enable-library-coverage $CABAL_FLAGS
-  - cabal build
-  - cabal test
+- cabal configure --enable-library-coverage $CABAL_FLAGS
+- cabal build
+- cabal test
 
 after_script:
-  - TESTSUITE=toxcore-0.0.2
-  - cp dist/hpc/mix/testsuite/*.mix dist/hpc/mix/$TESTSUITE/
-  - hpc-coveralls $TESTSUITE
-
-branches:
-  only:
-  - master
+- TESTSUITE=toxcore-0.0.2
+- cp dist/hpc/mix/testsuite/*.mix dist/hpc/mix/$TESTSUITE/
+- hpc-coveralls $TESTSUITE
