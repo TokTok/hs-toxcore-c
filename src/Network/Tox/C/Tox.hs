@@ -1828,11 +1828,8 @@ foreign import ccall tox_callback_conference_title :: Tox a -> FunPtr (CConferen
 
 -- | Peer list state change types.
 data ConferenceStateChange
-  = ConferenceStateChangePeerJoin
-    -- A peer has joined the conference.
-
-  | ConferenceStateChangePeerExit
-    -- A peer has exited the conference.
+  = ConferenceStateChangeListChanged
+    -- A peer has joined or exited the conference.
 
   | ConferenceStateChangePeerNameChange
     -- A peer has changed their name.
