@@ -1,4 +1,7 @@
 load("@io_tweag_rules_haskell//haskell:haskell.bzl", "haskell_binary", "haskell_library")
+load("//tools:project.bzl", "project")
+
+project("hs-toxcore-c")
 
 haskell_library(
     name = "hs-toxcore-c",
