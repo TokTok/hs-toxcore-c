@@ -24,8 +24,8 @@ install:
 
 script:
 - cabal configure --enable-library-coverage $CABAL_FLAGS
-- cabal build
-- cabal test
+- travis_wait cabal build
+- travis_wait cabal test
 
 after_script:
 - TESTSUITE=toxcore-0.0.2

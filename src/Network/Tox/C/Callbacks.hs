@@ -43,8 +43,10 @@ class CHandler a where
   cConferenceMessage _ _ _ _ _ ud = return ud
   cConferenceTitle          :: Tox.ConferenceTitleCb          a
   cConferenceTitle _ _ _ _ ud = return ud
-  cConferenceNamelistChange :: Tox.ConferenceNamelistChangeCb a
-  cConferenceNamelistChange _ _ _ _ ud = return ud
+  cConferencePeerName :: Tox.ConferencePeerNameCb a
+  cConferencePeerName _ _ _ _ ud = return ud
+  cConferencePeerListChanged :: Tox.ConferencePeerListChangedCb a
+  cConferencePeerListChanged _ _ ud = return ud
   cFriendLossyPacket        :: Tox.FriendLossyPacketCb        a
   cFriendLossyPacket _ _ _ ud = return ud
   cFriendLosslessPacket     :: Tox.FriendLosslessPacketCb     a
@@ -56,25 +58,26 @@ class CHandler a where
 -- save the original event handlers.
 withCHandler :: CHandler a => Tox a -> IO r -> IO r
 withCHandler tox =
-  install Tox.tox_callback_self_connection_status     (Tox.selfConnectionStatusCb     cSelfConnectionStatus     ) .
-  install Tox.tox_callback_friend_name                (Tox.friendNameCb               cFriendName               ) .
-  install Tox.tox_callback_friend_status_message      (Tox.friendStatusMessageCb      cFriendStatusMessage      ) .
-  install Tox.tox_callback_friend_status              (Tox.friendStatusCb             cFriendStatus             ) .
-  install Tox.tox_callback_friend_connection_status   (Tox.friendConnectionStatusCb   cFriendConnectionStatus   ) .
-  install Tox.tox_callback_friend_typing              (Tox.friendTypingCb             cFriendTyping             ) .
-  install Tox.tox_callback_friend_read_receipt        (Tox.friendReadReceiptCb        cFriendReadReceipt        ) .
-  install Tox.tox_callback_friend_request             (Tox.friendRequestCb            cFriendRequest            ) .
-  install Tox.tox_callback_friend_message             (Tox.friendMessageCb            cFriendMessage            ) .
-  install Tox.tox_callback_file_recv_control          (Tox.fileRecvControlCb          cFileRecvControl          ) .
-  install Tox.tox_callback_file_chunk_request         (Tox.fileChunkRequestCb         cFileChunkRequest         ) .
-  install Tox.tox_callback_file_recv                  (Tox.fileRecvCb                 cFileRecv                 ) .
-  install Tox.tox_callback_file_recv_chunk            (Tox.fileRecvChunkCb            cFileRecvChunk            ) .
-  install Tox.tox_callback_conference_invite          (Tox.conferenceInviteCb         cConferenceInvite         ) .
-  install Tox.tox_callback_conference_message         (Tox.conferenceMessageCb        cConferenceMessage        ) .
-  install Tox.tox_callback_conference_title           (Tox.conferenceTitleCb          cConferenceTitle          ) .
-  install Tox.tox_callback_conference_namelist_change (Tox.conferenceNamelistChangeCb cConferenceNamelistChange ) .
-  install Tox.tox_callback_friend_lossy_packet        (Tox.friendLossyPacketCb        cFriendLossyPacket        ) .
-  install Tox.tox_callback_friend_lossless_packet     (Tox.friendLosslessPacketCb     cFriendLosslessPacket     )
+  install Tox.tox_callback_self_connection_status       (Tox.selfConnectionStatusCb      cSelfConnectionStatus     ) .
+  install Tox.tox_callback_friend_name                  (Tox.friendNameCb                cFriendName               ) .
+  install Tox.tox_callback_friend_status_message        (Tox.friendStatusMessageCb       cFriendStatusMessage      ) .
+  install Tox.tox_callback_friend_status                (Tox.friendStatusCb              cFriendStatus             ) .
+  install Tox.tox_callback_friend_connection_status     (Tox.friendConnectionStatusCb    cFriendConnectionStatus   ) .
+  install Tox.tox_callback_friend_typing                (Tox.friendTypingCb              cFriendTyping             ) .
+  install Tox.tox_callback_friend_read_receipt          (Tox.friendReadReceiptCb         cFriendReadReceipt        ) .
+  install Tox.tox_callback_friend_request               (Tox.friendRequestCb             cFriendRequest            ) .
+  install Tox.tox_callback_friend_message               (Tox.friendMessageCb             cFriendMessage            ) .
+  install Tox.tox_callback_file_recv_control            (Tox.fileRecvControlCb           cFileRecvControl          ) .
+  install Tox.tox_callback_file_chunk_request           (Tox.fileChunkRequestCb          cFileChunkRequest         ) .
+  install Tox.tox_callback_file_recv                    (Tox.fileRecvCb                  cFileRecv                 ) .
+  install Tox.tox_callback_file_recv_chunk              (Tox.fileRecvChunkCb             cFileRecvChunk            ) .
+  install Tox.tox_callback_conference_invite            (Tox.conferenceInviteCb          cConferenceInvite         ) .
+  install Tox.tox_callback_conference_message           (Tox.conferenceMessageCb         cConferenceMessage        ) .
+  install Tox.tox_callback_conference_title             (Tox.conferenceTitleCb           cConferenceTitle          ) .
+  install Tox.tox_callback_conference_peer_name         (Tox.conferencePeerNameCb        cConferencePeerName       ) .
+  install Tox.tox_callback_conference_peer_list_changed (Tox.conferencePeerListChangedCb cConferencePeerListChanged ) .
+  install Tox.tox_callback_friend_lossy_packet          (Tox.friendLossyPacketCb         cFriendLossyPacket        ) .
+  install Tox.tox_callback_friend_lossless_packet       (Tox.friendLosslessPacketCb      cFriendLosslessPacket     )
   where
     install cInstall wrapper action =
       bracket wrapper (uninstall cInstall) $ \cb -> do

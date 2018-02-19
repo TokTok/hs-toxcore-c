@@ -1826,34 +1826,45 @@ conferenceTitleCb = wrapConferenceTitleCb . callConferenceTitleCb
 foreign import ccall tox_callback_conference_title :: Tox a -> FunPtr (CConferenceTitleCb a) -> IO ()
 
 
--- | Peer list state change types.
-data ConferenceStateChange
-  = ConferenceStateChangeListChanged
-    -- A peer has joined or exited the conference.
+-- | @param conference_number The conference number of the conference the peer is in.
+-- @param peer_number The ID of the peer who changed their name.
+-- @param name The new name of the peer.
+type ConferencePeerNameCb a = Tox a -> Word32 -> Word32 -> String -> a -> IO a
+type CConferencePeerNameCb a = Tox a -> Word32 -> Word32 -> CString -> CSize -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapConferencePeerNameCb :: CConferencePeerNameCb a -> IO (FunPtr (CConferencePeerNameCb a))
 
-  | ConferenceStateChangePeerNameChange
-    -- A peer has changed their name.
-  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+callConferencePeerNameCb :: ConferencePeerNameCb a -> CConferencePeerNameCb a
+callConferencePeerNameCb f tox gn pn nameStr nameLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  name <- peekCStringLen (nameStr, fromIntegral nameLen)
+  modifyMVar_ ud $ f tox gn pn name
 
-
--- | @param conference_number The conference number of the conference the title change is intended for.
--- @param peer_number The ID of the peer who changed the title.
--- @param change The type of change (one of TOX_CONFERENCE_STATE_CHANGE).
-type ConferenceNamelistChangeCb a = Tox a -> Word32 -> Word32 -> ConferenceStateChange -> a -> IO a
-type CConferenceNamelistChangeCb a = Tox a -> Word32 -> Word32 -> CEnum ConferenceStateChange -> UserData a -> IO ()
-foreign import ccall "wrapper" wrapConferenceNamelistChangeCb :: CConferenceNamelistChangeCb a -> IO (FunPtr (CConferenceNamelistChangeCb a))
-
-callConferenceNamelistChangeCb :: ConferenceNamelistChangeCb a -> CConferenceNamelistChangeCb a
-callConferenceNamelistChangeCb f tox gn pn changeType = deRefStablePtr >=> (`modifyMVar_` f tox gn pn (fromCEnum changeType))
-
-conferenceNamelistChangeCb :: ConferenceNamelistChangeCb a -> IO (FunPtr (CConferenceNamelistChangeCb a))
-conferenceNamelistChangeCb = wrapConferenceNamelistChangeCb . callConferenceNamelistChangeCb
+conferencePeerNameCb :: ConferencePeerNameCb a -> IO (FunPtr (CConferencePeerNameCb a))
+conferencePeerNameCb = wrapConferencePeerNameCb . callConferencePeerNameCb
 
 
--- | Set the callback for the `conference_namelist_change` event. Pass NULL to unset.
+-- | Set the callback for the `conference_peer_name` event. Pass NULL to unset.
 --
--- This event is triggered when the peer list changes (name change, peer join, peer exit).
-foreign import ccall tox_callback_conference_namelist_change :: Tox a -> FunPtr (CConferenceNamelistChangeCb a) -> IO ()
+-- This event is triggered when the peer changes their nickname.
+foreign import ccall tox_callback_conference_peer_name :: Tox a -> FunPtr (CConferencePeerNameCb a) -> IO ()
+
+
+-- | @param conference_number The conference number of the conference for which the peer list changed.
+type ConferencePeerListChangedCb a = Tox a -> Word32 -> a -> IO a
+type CConferencePeerListChangedCb a = Tox a -> Word32 -> UserData a -> IO ()
+foreign import ccall "wrapper" wrapConferencePeerListChangedCb :: CConferencePeerListChangedCb a -> IO (FunPtr (CConferencePeerListChangedCb a))
+
+callConferencePeerListChangedCb :: ConferencePeerListChangedCb a -> CConferencePeerListChangedCb a
+callConferencePeerListChangedCb f tox gn = deRefStablePtr >=> (`modifyMVar_` f tox gn)
+
+conferencePeerListChangedCb :: ConferencePeerListChangedCb a -> IO (FunPtr (CConferencePeerListChangedCb a))
+conferencePeerListChangedCb = wrapConferencePeerListChangedCb . callConferencePeerListChangedCb
+
+
+-- | Set the callback for the `conference_peer_list_changed` event. Pass NULL to unset.
+--
+-- This event is triggered when the peer list changes (peer join, peer exit).
+foreign import ccall tox_callback_conference_peer_list_changed :: Tox a -> FunPtr (CConferencePeerListChangedCb a) -> IO ()
 
 
 data ErrConferenceNew
