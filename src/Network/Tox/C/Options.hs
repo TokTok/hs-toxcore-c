@@ -31,7 +31,7 @@ data ProxyType
     -- HTTP proxy using CONNECT.
   | ProxyTypeSocks5
     -- SOCKS proxy for simple socket pipes.
-  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+  deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
 
 
 -- Type of savedata to create the Tox instance from.
@@ -42,7 +42,7 @@ data SavedataType
     -- Savedata is one that was obtained from tox_get_savedata
   | SavedataTypeSecretKey
     -- Savedata is a secret key of length 'tox_secret_key_size'
-  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+  deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
 
 
 -- This struct contains all the startup options for Tox. You can either allocate

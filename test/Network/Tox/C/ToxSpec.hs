@@ -5,36 +5,46 @@ module Network.Tox.C.ToxSpec where
 import           Control.Applicative               ((<$>), (<*>))
 import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxPK, boxSK)
 import qualified Data.ByteString                   as BS
-import           Data.ByteString.Arbitrary         (fromABS)
+import           Data.ByteString.Arbitrary         (ArbByteString (ABS),
+                                                    fromABS)
 import           Data.Default.Class                (def)
 import           Data.Proxy                        (Proxy (..))
 import           Test.Hspec
 import           Test.QuickCheck
-import           Test.QuickCheck.Arbitrary         (arbitraryBoundedEnum)
+import           Test.QuickCheck.Arbitrary         (arbitraryBoundedEnum,
+                                                    genericShrink)
 
 import qualified Network.Tox.C                     as C
 
 
 instance Arbitrary C.ProxyType where
+  shrink = genericShrink
   arbitrary = arbitraryBoundedEnum
 
 instance Arbitrary C.SavedataType where
+  shrink = genericShrink
   arbitrary = arbitraryBoundedEnum
 
+instance Arbitrary BS.ByteString where
+  shrink bs = if BS.null bs then [] else BS.inits bs
+  arbitrary = fromABS <$> arbitrary
+
+filterNul :: C.Options -> C.Options
+filterNul o@C.Options{C.proxyHost = h} = o{C.proxyHost = filter (/= '\NUL') h}
+
 instance Arbitrary C.Options where
-  arbitrary = C.Options
+  shrink = map filterNul . genericShrink
+  arbitrary = filterNul <$> (C.Options
     <$> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> arbitraryCString
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> (fromABS <$> arbitrary)
-    where
-      arbitraryCString = filter (/= '\NUL') <$> arbitrary
+    <*> arbitrary
+    <*> arbitrary)
 
 
 getRight :: (Monad m, Show a) => Either a b -> m b
