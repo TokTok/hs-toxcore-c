@@ -1,13 +1,13 @@
 name:                 toxcore
 synopsis:             Haskell bindings to the C reference implementation of Tox
-version:              0.0.2
+version:              0.2.0
 cabal-version:        >= 1.10
-license:              AGPL-3
+license:              GPL-3
 license-file:         LICENSE.md
 build-type:           Simple
 author:               iphy
 maintainer:           iphy
-copyright:            © 2016 iphy
+copyright:            © 2016-2018 iphy
 homepage:             https://toktok.github.io
 category:             Network
 description:
