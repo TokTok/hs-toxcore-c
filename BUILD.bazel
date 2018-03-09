@@ -6,6 +6,11 @@ project("hs-toxcore-c")
 haskell_library(
     name = "hs-toxcore-c",
     srcs = glob(["src/**/*.*hs"]),
+    compiler_flags = [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-imports",
+    ],
     prebuilt_dependencies = [
         "base",
         "bytestring",
@@ -21,6 +26,11 @@ haskell_library(
 haskell_binary(
     name = "groupbot",
     srcs = ["tools/groupbot/Main.hs"],
+    compiler_flags = [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-imports",
+    ],
     prebuilt_dependencies = [
         "base",
         "bytestring",
@@ -36,6 +46,11 @@ haskell_binary(
 haskell_test(
     name = "test",
     srcs = glob(["test/**/*.hs"]),
+    compiler_flags = [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-imports",
+    ],
     main_file = "test/testsuite.hs",
     prebuilt_dependencies = [
         "base",

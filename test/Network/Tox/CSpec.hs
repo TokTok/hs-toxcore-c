@@ -5,18 +5,14 @@ module Network.Tox.CSpec where
 
 import           Control.Applicative     ((<$>))
 import           Control.Concurrent      (threadDelay)
-import           Control.Concurrent.MVar (MVar, newMVar, putMVar, readMVar,
-                                          takeMVar)
+import           Control.Concurrent.MVar (MVar, newMVar, readMVar)
 import           Control.Exception       (bracket)
-import           Control.Monad           (replicateM_, when)
+import           Control.Monad           (when)
 import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Base16  as Base16
 import           Data.String             (fromString)
-import           Foreign.Marshal.Alloc   (alloca)
-import           Foreign.Marshal.Utils   (with)
-import           Foreign.Ptr             (freeHaskellFunPtr, nullPtr)
-import           Foreign.StablePtr       (StablePtr, deRefStablePtr,
-                                          freeStablePtr, newStablePtr)
+import           Foreign.StablePtr       (StablePtr, freeStablePtr,
+                                          newStablePtr)
 import           Foreign.Storable        (Storable (..))
 import           Test.Hspec
 

@@ -2,23 +2,15 @@
 {-# LANGUAGE LambdaCase                 #-}
 module Main (main) where
 
-import           Control.Applicative     ((<$>))
 import           Control.Concurrent      (threadDelay)
-import           Control.Concurrent.MVar (MVar, modifyMVar_, newMVar, putMVar,
-                                          readMVar, takeMVar)
+import           Control.Concurrent.MVar (MVar, newMVar)
 import           Control.Exception       (AsyncException (UserInterrupt), catch,
                                           throwIO)
-import           Control.Exception       (bracket)
-import           Control.Monad           (forever, replicateM_, when)
+import           Control.Monad           (forever)
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Char8   as BS
 import           Data.String             (fromString)
 import           Data.Word               (Word32)
-import           Foreign.Marshal.Alloc   (alloca)
-import           Foreign.Marshal.Utils   (with)
-import           Foreign.Ptr             (freeHaskellFunPtr, nullPtr)
-import           Foreign.StablePtr       (StablePtr, deRefStablePtr,
-                                          freeStablePtr, newStablePtr)
 import           Foreign.Storable        (Storable (..))
 import           System.Directory        (doesFileExist)
 import           System.Exit             (exitSuccess)

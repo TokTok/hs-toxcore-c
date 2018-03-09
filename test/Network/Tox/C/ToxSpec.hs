@@ -5,10 +5,8 @@ module Network.Tox.C.ToxSpec where
 import           Control.Applicative               ((<$>), (<*>))
 import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxPK, boxSK)
 import qualified Data.ByteString                   as BS
-import           Data.ByteString.Arbitrary         (ArbByteString (ABS),
-                                                    fromABS)
+import           Data.ByteString.Arbitrary         (fromABS)
 import           Data.Default.Class                (def)
-import           Data.Proxy                        (Proxy (..))
 import           Test.Hspec
 import           Test.QuickCheck
 import           Test.QuickCheck.Arbitrary         (arbitraryBoundedEnum,
