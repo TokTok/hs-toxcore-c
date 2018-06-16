@@ -21,7 +21,7 @@ import qualified Network.Tox.C           as C
 bootstrapKey :: BS.ByteString
 bootstrapKey =
   fst . Base16.decode . fromString $
-    "F404ABAA1C99A9D37D61AB54898F56793E1DEF8BD46B1038B9D822E8460FAB67"
+    "15E9C309CFCB79FDDF0EBA057DABB49FE15F3803B1BFF06536AE2E5BA5E4690E"
 
 isMasterKey :: BS.ByteString -> Bool
 isMasterKey key =
@@ -32,7 +32,7 @@ botName :: String
 botName = "groupbot"
 
 bootstrapHost :: String
-bootstrapHost = "biribiri.org"
+bootstrapHost = "tox.ngc.zone"
 
 savedataFilename :: String
 savedataFilename = "groupbot.tox"
