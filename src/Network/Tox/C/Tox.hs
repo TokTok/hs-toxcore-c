@@ -185,6 +185,11 @@ data ErrNew
     -- When loading from badly formatted data, some data may have been loaded,
     -- and the rest is discarded. Passing an invalid length parameter also
     -- causes this error.
+
+  | ErrNewProxyWithUdp
+    -- UDP was enabled together with a proxy. This is a security issue, because
+    -- UDP connections are never proxied. You must disable UDP in order to use a
+    -- proxy.
   deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
