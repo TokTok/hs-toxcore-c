@@ -12,45 +12,45 @@ import           Network.Tox.C.Type (Tox)
 -- opaque Haskell values around in C.
 class CHandler a where
   cSelfConnectionStatus     :: Tox.SelfConnectionStatusCb     a
-  cSelfConnectionStatus _ _ ud = return ud
+  cSelfConnectionStatus _ _ = return
   cFriendName               :: Tox.FriendNameCb               a
-  cFriendName _ _ _ ud = return ud
+  cFriendName _ _ _ = return
   cFriendStatusMessage      :: Tox.FriendStatusMessageCb      a
-  cFriendStatusMessage _ _ _ ud = return ud
+  cFriendStatusMessage _ _ _ = return
   cFriendStatus             :: Tox.FriendStatusCb             a
-  cFriendStatus _ _ _ ud = return ud
+  cFriendStatus _ _ _ = return
   cFriendConnectionStatus   :: Tox.FriendConnectionStatusCb   a
-  cFriendConnectionStatus _ _ _ ud = return ud
+  cFriendConnectionStatus _ _ _ = return
   cFriendTyping             :: Tox.FriendTypingCb             a
-  cFriendTyping _ _ _ ud = return ud
+  cFriendTyping _ _ _ = return
   cFriendReadReceipt        :: Tox.FriendReadReceiptCb        a
-  cFriendReadReceipt _ _ _ ud = return ud
+  cFriendReadReceipt _ _ _ = return
   cFriendRequest            :: Tox.FriendRequestCb            a
-  cFriendRequest _ _ _ ud = return ud
+  cFriendRequest _ _ _ = return
   cFriendMessage            :: Tox.FriendMessageCb            a
-  cFriendMessage _ _ _ _ ud = return ud
+  cFriendMessage _ _ _ _ = return
   cFileRecvControl          :: Tox.FileRecvControlCb          a
-  cFileRecvControl _ _ _ _ ud = return ud
+  cFileRecvControl _ _ _ _ = return
   cFileChunkRequest         :: Tox.FileChunkRequestCb         a
-  cFileChunkRequest _ _ _ _ _ ud = return ud
+  cFileChunkRequest _ _ _ _ _ = return
   cFileRecv                 :: Tox.FileRecvCb                 a
-  cFileRecv _ _ _ _ _ _ ud = return ud
+  cFileRecv _ _ _ _ _ _ = return
   cFileRecvChunk            :: Tox.FileRecvChunkCb            a
-  cFileRecvChunk _ _ _ _ _ ud = return ud
+  cFileRecvChunk _ _ _ _ _ = return
   cConferenceInvite         :: Tox.ConferenceInviteCb         a
-  cConferenceInvite _ _ _ _ ud = return ud
+  cConferenceInvite _ _ _ _ = return
   cConferenceMessage        :: Tox.ConferenceMessageCb        a
-  cConferenceMessage _ _ _ _ _ ud = return ud
+  cConferenceMessage _ _ _ _ _ = return
   cConferenceTitle          :: Tox.ConferenceTitleCb          a
-  cConferenceTitle _ _ _ _ ud = return ud
+  cConferenceTitle _ _ _ _ = return
   cConferencePeerName :: Tox.ConferencePeerNameCb a
-  cConferencePeerName _ _ _ _ ud = return ud
+  cConferencePeerName _ _ _ _ = return
   cConferencePeerListChanged :: Tox.ConferencePeerListChangedCb a
-  cConferencePeerListChanged _ _ ud = return ud
+  cConferencePeerListChanged _ _ = return
   cFriendLossyPacket        :: Tox.FriendLossyPacketCb        a
-  cFriendLossyPacket _ _ _ ud = return ud
+  cFriendLossyPacket _ _ _ = return
   cFriendLosslessPacket     :: Tox.FriendLosslessPacketCb     a
-  cFriendLosslessPacket _ _ _ ud = return ud
+  cFriendLosslessPacket _ _ _ = return
 
 
 -- | Installs an event handler into the passed 'Tox' instance. After performing

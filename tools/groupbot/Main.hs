@@ -68,7 +68,7 @@ instance C.CHandler UserData where
   cSelfConnectionStatus _ conn ud = do
     putStrLn "SelfConnectionStatusCb"
     print conn
-    return $ ud
+    return ud
 
   cFriendRequest tox pk msg ud = do
     putStrLn "FriendRequestCb"
@@ -102,7 +102,7 @@ instance C.CHandler UserData where
   cConferenceInvite tox fn _confType cookie ud = do
     putStrLn "ConferenceInvite"
     print fn
-    pk <- getRight =<< (C.toxFriendGetPublicKey tox fn)
+    pk <- getRight =<< C.toxFriendGetPublicKey tox fn
     if isMasterKey pk
     then do
       putStrLn "Joining!"

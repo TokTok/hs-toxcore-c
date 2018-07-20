@@ -88,7 +88,8 @@ import qualified Data.ByteString         as BS
 import           Data.Word               (Word16, Word32, Word64)
 import           Foreign.C.String        (CString, peekCStringLen, withCString,
                                           withCStringLen)
-import           Foreign.C.Types         (CInt (..), CSize (..), CTime (..))
+import           Foreign.C.Types         (CChar (..), CInt (..), CSize (..),
+                                          CTime (..))
 import           Foreign.Marshal.Alloc   (alloca)
 import           Foreign.Marshal.Array   (allocaArray, peekArray)
 import           Foreign.Ptr             (FunPtr, Ptr, nullPtr)
@@ -768,14 +769,23 @@ callFriendGetPublicKey :: (Tox a -> Word32 -> CString -> CErr ErrFriendGetPublic
                           Tox a -> Word32 -> IO (Either ErrFriendGetPublicKey BS.ByteString)
 callFriendGetPublicKey f tox fn =
   let pkLen = fromIntegral tox_public_key_size in
-  alloca $ \errPtr -> do
+  alloca $ \errPtr ->
     allocaArray pkLen $ \pkPtr -> do
       _ <- f tox fn pkPtr errPtr
-      err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
-      str <- BS.packCStringLen (pkPtr, pkLen)
-      return $ if err /= minBound
-               then Left  err
-               else Right str
+      callGetPublicKey errPtr pkPtr pkLen
+
+callGetPublicKey
+  :: (Bounded err, Enum err, Eq err)
+  => Ptr (CEnum err)
+  -> Ptr CChar
+  -> Int
+  -> IO (Either err BS.ByteString)
+callGetPublicKey errPtr pkPtr pkLen = do
+  err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
+  str <- BS.packCStringLen (pkPtr, pkLen)
+  return $ if err /= minBound
+           then Left  err
+           else Right str
 
 toxFriendGetPublicKey :: Tox a -> Word32 -> IO (Either ErrFriendGetPublicKey BS.ByteString)
 toxFriendGetPublicKey = callFriendGetPublicKey tox_friend_get_public_key
@@ -797,7 +807,7 @@ data ErrFriendGetLastOnline
 foreign import ccall tox_friend_get_last_online :: Tox a -> Word32 -> CErr ErrFriendGetLastOnline -> IO Word64
 callFriendGetLastOnline :: (Tox a -> Word32 -> CErr ErrFriendGetLastOnline -> IO Word64) ->
                            Tox a -> Word32 -> IO (Either ErrFriendGetLastOnline EpochTime)
-callFriendGetLastOnline f tox fn = callErrFun $ \errPtr -> (f tox fn errPtr) >>= (return . CTime . fromIntegral)
+callFriendGetLastOnline f tox fn = callErrFun (f tox fn >=> (return . CTime . fromIntegral))
 
 toxFriendGetLastOnline :: Tox a -> Word32 -> IO (Either ErrFriendGetLastOnline EpochTime)
 toxFriendGetLastOnline = callFriendGetLastOnline tox_friend_get_last_online
@@ -855,9 +865,8 @@ toxFriendGetName tox fn = do
       nameRes <- callErrFun $ tox_friend_get_name tox fn namePtr
       case nameRes of
         Left err -> return $ Left err
-        Right _ -> do
-          name <- peekCStringLen (namePtr, fromIntegral nameLen)
-          return $ Right name
+        Right _ ->
+          Right <$> peekCStringLen (namePtr, fromIntegral nameLen)
 
 
 -- | @param friend_number The friend number of the friend whose name changed.
@@ -931,9 +940,8 @@ toxFriendGetStatusMessage tox fn = do
       statusMessageRes <- callErrFun $ tox_friend_get_status_message tox fn statusMessagePtr
       case statusMessageRes of
         Left err -> return $ Left err
-        Right _ -> do
-          statusMessage <- peekCStringLen (statusMessagePtr, fromIntegral statusMessageLen)
-          return $ Right statusMessage
+        Right _ ->
+          Right <$> peekCStringLen (statusMessagePtr, fromIntegral statusMessageLen)
 
 
 -- | Set the callback for the `friend_status_message` event. Pass 'nullPtr' to
@@ -977,7 +985,7 @@ foreign import ccall tox_friend_get_connection_status :: Tox a -> Word32 -> CErr
 
 callFriendGetConnectionStatus :: (Tox a -> Word32 -> CErr ErrFriendQuery -> IO (CEnum Connection)) ->
                                  Tox a -> Word32 -> IO (Either ErrFriendQuery Connection)
-callFriendGetConnectionStatus f tox fn = callErrFun $ \errPtr -> (f tox fn errPtr) >>= (return . fromCEnum)
+callFriendGetConnectionStatus f tox fn = callErrFun (f tox fn >=> (return . fromCEnum))
 
 toxFriendGetConnectionStatus :: Tox a -> Word32 -> IO (Either ErrFriendQuery Connection)
 toxFriendGetConnectionStatus = callFriendGetConnectionStatus tox_friend_get_connection_status
@@ -1248,9 +1256,9 @@ foreign import ccall tox_callback_friend_message :: Tox a -> FunPtr (CFriendMess
 foreign import ccall tox_hash :: CString -> CString -> CSize -> IO Bool
 
 toxHash :: BS.ByteString -> IO BS.ByteString
-toxHash d = do
-  let hashLen = fromIntegral tox_hash_length
-  allocaArray hashLen $ \hashPtr -> do
+toxHash d =
+  let hashLen = fromIntegral tox_hash_length in
+  allocaArray hashLen $ \hashPtr ->
     BS.useAsCStringLen d $ \(dataPtr, dataLen) -> do
       _ <- tox_hash hashPtr dataPtr (fromIntegral dataLen)
       BS.packCStringLen (dataPtr, fromIntegral dataLen)
@@ -1443,7 +1451,7 @@ callFileGetFileId :: (Tox a -> Word32 -> Word32 -> CString -> CErr ErrFileGet ->
                      Tox a -> Word32 -> Word32 -> IO (Either ErrFileGet BS.ByteString)
 callFileGetFileId f tox fn fileNum =
   let fileIdLen = fromIntegral tox_file_id_length in
-  alloca $ \errPtr -> do
+  alloca $ \errPtr ->
     allocaArray fileIdLen $ \fileIdPtr -> do
       _ <- f tox fn fileNum fileIdPtr errPtr
       err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
@@ -1959,9 +1967,8 @@ toxConferencePeerGetName tox gn pn = do
       nameRes <- callErrFun $ tox_conference_peer_get_name tox gn pn namePtr
       case nameRes of
         Left err -> return $ Left err
-        Right _ -> do
-          name <- peekCStringLen (namePtr, fromIntegral nameLen)
-          return $ Right name
+        Right _ ->
+          Right <$> peekCStringLen (namePtr, fromIntegral nameLen)
 
 
 -- | Copy the public key of peer_number who is in conference_number to public_key.
@@ -1973,14 +1980,10 @@ callConferencePeerGetPublicKey :: (Tox a -> Word32 -> Word32 -> CString -> CErr 
                           Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
 callConferencePeerGetPublicKey f tox gn pn =
   let pkLen = fromIntegral tox_public_key_size in
-  alloca $ \errPtr -> do
+  alloca $ \errPtr ->
     allocaArray pkLen $ \pkPtr -> do
       _ <- f tox gn pn pkPtr errPtr
-      err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
-      str <- BS.packCStringLen (pkPtr, pkLen)
-      return $ if err /= minBound
-               then Left  err
-               else Right str
+      callGetPublicKey errPtr pkPtr pkLen
 
 toxConferencePeerGetPublicKey :: Tox a -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
 toxConferencePeerGetPublicKey = callConferencePeerGetPublicKey tox_conference_peer_get_public_key
@@ -2059,7 +2062,7 @@ data ErrConferenceJoin
 foreign import ccall tox_conference_join :: Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceJoin -> IO Word32
 callConferenceJoin :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceJoin -> IO Word32) ->
                         Tox a -> Word32 -> BS.ByteString -> IO (Either ErrConferenceJoin Word32)
-callConferenceJoin f tox fn cookie = do
+callConferenceJoin f tox fn cookie =
   BS.useAsCStringLen cookie $ \(cookiePtr, cookieLen) ->
     callErrFun $ f tox fn cookiePtr (fromIntegral cookieLen)
 
@@ -2105,7 +2108,7 @@ data ErrConferenceSendMessage
 foreign import ccall tox_conference_send_message :: Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrConferenceSendMessage -> IO Bool
 callConferenceSendMessage :: (Tox a -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrConferenceSendMessage -> IO Bool) ->
                         Tox a -> Word32 -> MessageType -> String -> IO (Either ErrConferenceSendMessage Bool)
-callConferenceSendMessage f tox gn messageType message = do
+callConferenceSendMessage f tox gn messageType message =
   withCStringLen message $ \(msgPtr, msgLen) ->
     callErrFun $ f tox gn (toCEnum messageType) msgPtr (fromIntegral msgLen)
 
@@ -2158,9 +2161,8 @@ toxConferenceGetTitle tox gn = do
       titleRes <- callErrFun $ tox_conference_get_title tox gn titlePtr
       case titleRes of
         Left err -> return $ Left err
-        Right _ -> do
-          title <- peekCStringLen (titlePtr, fromIntegral titleLen)
-          return $ Right title
+        Right _ ->
+          Right <$> peekCStringLen (titlePtr, fromIntegral titleLen)
 
 -- | Set the conference title and broadcast it to the rest of the conference.
 --
@@ -2170,7 +2172,7 @@ toxConferenceGetTitle tox gn = do
 foreign import ccall tox_conference_set_title :: Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceTitle -> IO Bool
 callConferenceSetTitle :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrConferenceTitle -> IO Bool) ->
                         Tox a -> Word32 -> String -> IO (Either ErrConferenceTitle Bool)
-callConferenceSetTitle f tox gn title = do
+callConferenceSetTitle f tox gn title =
   withCStringLen title $ \(titlePtr, titleLen) ->
     callErrFun $ f tox gn titlePtr (fromIntegral titleLen)
 
@@ -2207,7 +2209,7 @@ data ErrConferenceGetType
 foreign import ccall tox_conference_get_type :: Tox a -> Word32 -> CErr ErrConferenceGetType -> IO (CEnum ConferenceType)
 callConferenceGetType :: (Tox a -> Word32 -> CErr ErrConferenceGetType -> IO (CEnum ConferenceType)) ->
                          Tox a -> Word32 -> IO (Either ErrConferenceGetType ConferenceType)
-callConferenceGetType f tox gn = callErrFun $ \errPtr -> (f tox gn errPtr) >>= (return . fromCEnum)
+callConferenceGetType f tox gn = callErrFun (f tox gn >=> (return . fromCEnum))
 
 toxConferenceGetType :: Tox a -> Word32 -> IO (Either ErrConferenceGetType ConferenceType)
 toxConferenceGetType = callConferenceGetType tox_conference_get_type
@@ -2292,14 +2294,20 @@ toxFriendLossyPacket = callFriendLossyPacket tox_friend_send_lossy_packet
 --
 -- @return true on success.
 foreign import ccall tox_friend_send_lossless_packet :: Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool
-callFriendLoselessPacket :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool) ->
+callFriendLosslessPacket :: (Tox a -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool) ->
                          Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
-callFriendLoselessPacket f tox fn d =
+callFriendLosslessPacket f tox fn d =
   BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
     callErrFun $ f tox fn dataPtr (fromIntegral dataLen)
 
-toxFriendLoselessPacket :: Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
-toxFriendLoselessPacket = callFriendLoselessPacket tox_friend_send_lossless_packet
+toxFriendLosslessPacket :: Tox a -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+toxFriendLosslessPacket = callFriendLosslessPacket tox_friend_send_lossless_packet
+
+callFriendCustomPacketCb :: FriendLosslessPacketCb a -> CFriendLosslessPacketCb a
+callFriendCustomPacketCb f tox fn dataPtr dataLen udPtr = do
+  ud <- deRefStablePtr udPtr
+  d <- BS.packCStringLen (dataPtr, fromIntegral dataLen)
+  modifyMVar_ ud $ f tox fn d
 
 -- | @param friend_number The friend number of the friend who sent a lossy
 -- packet.
@@ -2310,10 +2318,7 @@ type CFriendLossyPacketCb a = Tox a -> Word32 -> CString -> CSize -> UserData a 
 foreign import ccall "wrapper" wrapFriendLossyPacketCb :: CFriendLossyPacketCb a -> IO (FunPtr (CFriendLossyPacketCb a))
 
 callFriendLossyPacketCb :: FriendLossyPacketCb a -> CFriendLossyPacketCb a
-callFriendLossyPacketCb f tox fn dataPtr dataLen udPtr = do
-  ud <- deRefStablePtr udPtr
-  d <- BS.packCStringLen (dataPtr, fromIntegral dataLen)
-  modifyMVar_ ud $ f tox fn d
+callFriendLossyPacketCb = callFriendCustomPacketCb
 
 friendLossyPacketCb :: FriendLossyPacketCb a -> IO (FunPtr (CFriendLossyPacketCb a))
 friendLossyPacketCb = wrapFriendLossyPacketCb . callFriendLossyPacketCb
@@ -2332,10 +2337,7 @@ type CFriendLosslessPacketCb a = Tox a -> Word32 -> CString -> CSize -> UserData
 foreign import ccall "wrapper" wrapFriendLosslessPacketCb :: CFriendLosslessPacketCb a -> IO (FunPtr (CFriendLosslessPacketCb a))
 
 callFriendLosslessPacketCb :: FriendLosslessPacketCb a -> CFriendLosslessPacketCb a
-callFriendLosslessPacketCb f tox fn dataPtr dataLen udPtr = do
-  ud <- deRefStablePtr udPtr
-  d <- BS.packCStringLen (dataPtr, fromIntegral dataLen)
-  modifyMVar_ ud $ f tox fn d
+callFriendLosslessPacketCb = callFriendCustomPacketCb
 
 friendLosslessPacketCb :: FriendLosslessPacketCb a -> IO (FunPtr (CFriendLosslessPacketCb a))
 friendLosslessPacketCb = wrapFriendLosslessPacketCb . callFriendLosslessPacketCb
