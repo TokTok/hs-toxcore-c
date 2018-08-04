@@ -27,12 +27,15 @@ instance Arbitrary BS.ByteString where
   shrink bs = if BS.null bs then [] else BS.inits bs
   arbitrary = fromABS <$> arbitrary
 
-filterNul :: C.Options -> C.Options
-filterNul o@C.Options{C.proxyHost = h} = o{C.proxyHost = filter (/= '\NUL') h}
+-- | Ensure that the hostname has a chance of being valid.
+filterHost :: C.Options -> C.Options
+filterHost o@C.Options{C.proxyHost = h} = o{C.proxyHost = filter (`elem` hostChars) h}
+  where
+    hostChars = ".-_" ++ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
 
 instance Arbitrary C.Options where
-  shrink = map filterNul . genericShrink
-  arbitrary = filterNul <$> (C.Options
+  shrink = map filterHost . genericShrink
+  arbitrary = fmap filterHost $ C.Options
     <$> arbitrary
     <*> arbitrary
     <*> arbitrary
@@ -42,7 +45,7 @@ instance Arbitrary C.Options where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> arbitrary)
+    <*> arbitrary
 
 
 getRight :: (Monad m, Show a) => Either a b -> m b

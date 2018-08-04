@@ -11,14 +11,13 @@ haskell_library(
         "-Werror",
         "-Wno-unused-imports",
     ],
-    prebuilt_dependencies = [
-        "base",
-        "bytestring",
-    ],
     src_strip_prefix = "src",
+    version = "0.2.0",
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",
+        "//third_party/haskell:base",
+        "//third_party/haskell:bytestring",
         "@haskell_data_default_class//:data-default-class",
     ],
 )
@@ -31,14 +30,12 @@ haskell_binary(
         "-Werror",
         "-Wno-unused-imports",
     ],
-    prebuilt_dependencies = [
-        "base",
-        "bytestring",
-        "directory",
-    ],
     src_strip_prefix = "tools/groupbot",
     deps = [
         ":hs-toxcore-c",
+        "//third_party/haskell:base",
+        "//third_party/haskell:bytestring",
+        "//third_party/haskell:directory",
         "@haskell_base16_bytestring//:base16-bytestring",
     ],
 )
@@ -51,14 +48,11 @@ haskell_test(
         "-Werror",
         "-Wno-unused-imports",
     ],
-    main_file = "test/testsuite.hs",
-    prebuilt_dependencies = [
-        "base",
-        "bytestring",
-    ],
     src_strip_prefix = "test",
     deps = [
         ":hs-toxcore-c",
+        "//third_party/haskell:base",
+        "//third_party/haskell:bytestring",
         "@haskell_QuickCheck//:QuickCheck",
         "@haskell_base16_bytestring//:base16-bytestring",
         "@haskell_bytestring_arbitrary//:bytestring-arbitrary",
