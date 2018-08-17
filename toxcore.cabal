@@ -3,7 +3,7 @@ synopsis:             Haskell bindings to the C reference implementation of Tox
 version:              0.2.0
 cabal-version:        >= 1.10
 license:              GPL-3
-license-file:         LICENSE.md
+license-file:         LICENSE
 build-type:           Simple
 author:               iphy
 maintainer:           iphy
