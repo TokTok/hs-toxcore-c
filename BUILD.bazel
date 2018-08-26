@@ -1,3 +1,4 @@
+load("@ai_formation_hazel//:hazel.bzl", "hazel_library")
 load("@io_tweag_rules_haskell//haskell:haskell.bzl", "haskell_binary", "haskell_library", "haskell_test")
 load("//tools/project:build_defs.bzl", "project")
 
@@ -16,9 +17,9 @@ haskell_library(
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",
-        "//third_party/haskell:base",
-        "//third_party/haskell:bytestring",
-        "@haskell_data_default_class//:data-default-class",
+        hazel_library("base"),
+        hazel_library("bytestring"),
+        hazel_library("data-default-class"),
     ],
 )
 
@@ -33,10 +34,10 @@ haskell_binary(
     src_strip_prefix = "tools/groupbot",
     deps = [
         ":hs-toxcore-c",
-        "//third_party/haskell:base",
-        "//third_party/haskell:bytestring",
-        "//third_party/haskell:directory",
-        "@haskell_base16_bytestring//:base16-bytestring",
+        hazel_library("base"),
+        hazel_library("base16-bytestring"),
+        hazel_library("bytestring"),
+        hazel_library("directory"),
     ],
 )
 
@@ -51,13 +52,13 @@ haskell_test(
     src_strip_prefix = "test",
     deps = [
         ":hs-toxcore-c",
-        "//third_party/haskell:base",
-        "//third_party/haskell:bytestring",
-        "@haskell_QuickCheck//:QuickCheck",
-        "@haskell_base16_bytestring//:base16-bytestring",
-        "@haskell_bytestring_arbitrary//:bytestring-arbitrary",
-        "@haskell_data_default_class//:data-default-class",
-        "@haskell_hspec//:hspec",
-        "@haskell_saltine//:saltine",
+        hazel_library("QuickCheck"),
+        hazel_library("base"),
+        hazel_library("base16-bytestring"),
+        hazel_library("bytestring"),
+        hazel_library("bytestring-arbitrary"),
+        hazel_library("data-default-class"),
+        hazel_library("hspec"),
+        hazel_library("saltine"),
     ],
 )
