@@ -22,10 +22,10 @@ import qualified Network.Tox.C           as C
 bootstrapKey :: BS.ByteString
 bootstrapKey =
   fst . Base16.decode . fromString $
-    "15E9C309CFCB79FDDF0EBA057DABB49FE15F3803B1BFF06536AE2E5BA5E4690E"
+    "F404ABAA1C99A9D37D61AB54898F56793E1DEF8BD46B1038B9D822E8460FAB67"
 
 bootstrapHost :: String
-bootstrapHost = "tox.ngc.zone"
+bootstrapHost = "node.tox.biribiri.org"
 
 
 options :: C.Options
