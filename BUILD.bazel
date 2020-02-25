@@ -44,6 +44,7 @@ haskell_binary(
 
 hspec_test(
     name = "test",
+    timeout = "short",
     compiler_flags = [
         "-Wall",
         "-Werror",
