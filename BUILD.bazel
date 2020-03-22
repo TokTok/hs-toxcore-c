@@ -8,11 +8,7 @@ project()
 haskell_library(
     name = "hs-toxcore-c",
     srcs = glob(["src/**/*.*hs"]),
-    compiler_flags = [
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-imports",
-    ],
+    compiler_flags = ["-Wno-unused-imports"],
     src_strip_prefix = "src",
     version = "0.2.0",
     visibility = ["//visibility:public"],
@@ -27,11 +23,7 @@ haskell_library(
 haskell_binary(
     name = "groupbot",
     srcs = ["tools/groupbot/Main.hs"],
-    compiler_flags = [
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-imports",
-    ],
+    compiler_flags = ["-Wno-unused-imports"],
     src_strip_prefix = "tools/groupbot",
     deps = [
         ":hs-toxcore-c",
@@ -45,11 +37,7 @@ haskell_binary(
 hspec_test(
     name = "test",
     timeout = "short",
-    compiler_flags = [
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-imports",
-    ],
+    compiler_flags = ["-Wno-unused-imports"],
     deps = [
         ":hs-toxcore-c",
         hazel_library("QuickCheck"),
