@@ -1,5 +1,14 @@
 ---
 language: generic
+dist: xenial
+os: linux
+
+env:
+  global:
+    # HACKAGE_USERNAME=[secure]
+    - secure: "hjaL3IXi+SN0S3rUxV61nkBk7ZCZ/aJS1vx/DQlILTBLCV9E7X9AjBJy5oSChCYF1si05a26GAw+K3w8F0vR9zXjqHbkq5PDhZJmy+MItIDTahXbF8sNrcqGsLPsr6vmLF+/WIU8BqwC2xnkdJMR43OvbcghhX+l5ZmDYmY4RajU6cTeKeBS4vYRpy+yv3RmDVQO1BhhmZ+MlH/x+4efGJSvrpj/1gjwlPv9uyYuikUqJb8i3LO4XIvpj/uDwzv5YwUjCTs0Hjkv+K3MVk8gKWwAZNpN59nmWBzrdUmyyl3Po9LdUbqyI9l5GDpK20Hyi9GRDkMMukf/NteestouIcaCVzRUx/zhCzpfWfchZrlCg6zEovbW2NAYt0MCj0kNG3YsJyKpAE+v5MGe0KN9WIZhxwzdbJ3aj9woBVwG165pzjeEYi88+1C+sZb7ttyJc2Zu17RIULB6udh6ti8aWAYwLaL/oRKGD+q/eMmGgH/kq/G8ZcfPepc4Go7qJA6PRtMrmnInvesS4goU6m7Yla0KDrkPJQpSJlIxUYqXErH2FjUVNmHfpPNC9vrN7NrpWAj0bvPFxTY6ESoqONLL0qDvpGpMYSM2kio5djtJW50iP1l1NuWmNiDW63nM9lAvJUAlIxcKLfviTF8Pua+VWVLTlmH6/aH1kFFu1u9m734="
+    # HACKAGE_PASSWORD=[secure]
+    - secure: "txywsEfVghfbFxdB8sOq5lDAcR7Na7ltOm2Ro4HRIHhLZ54Ud4/CRBt62yKO8+b/tj5ik5IyyHG8D6R2+zmohaFAIv6uGoXt2UKb/P79tRuLruaNdycy6oeT6DF2E4JBBF9SURoUynUsNDRnmG8LCA16Zs/3I6QMfRGZBl5IAdonSKoULGC6cGT+l+U5Uh656MX4ZgRLEGOK1mjAVZOW9qCj0uyva8M8sdcJJH8d9qmk4AA/Kw8NDst6uYl1cqeHJYxLW/2y2omoBpnwM4nyEG7yHD2L8GRr6DcvPwyYKqNP/PP9dP+GDbatu2nZT8vb5KJ2nx0o4386hSkUI5ZhjgljP+iwN06CBQd6poa+apvAPhxTlRkh6+bG3s3O5ft/9ccLydDRwPraqsH3Ot3IPcpsXJovaO0EaKZGSoM3ZMvXLM/7uufin9+zfB2MC4amhbz//O8OJnwdJXL4GRdorpg5jln5T0idxQ95Po4hRSHI75dz1oYA1o/e5ivhUzL78sHci0sUoOxuMWlLDKj4NssTTVEZSBTJir6NaWa6Qs1Mw+ommdkogPiwYB6okwtEFz3Rukk0S8QLcmr3/WV6a2e4uT46yHX9uvu+3r6xnwWyhCvtBBhVHvc1s1fVI2Qeu+IlrUdZ9qlgyb+fSIc3GtToYd3qAU4JPxsIpLD89wc="
 
 cache:
   timeout: 600
@@ -9,7 +18,7 @@ cache:
 
 before_install:
   - export PATH=$HOME/.local/bin:$PATH
-  - travis_retry curl -L https://github.com/TokTok/hs-tools/releases/download/v0.1/hs-tools-v0.1.tar.gz | tar xz -C $HOME
+  - travis_retry curl -L https://github.com/TokTok/hs-tools/releases/download/v0.6/hs-tools-v0.6.tar.gz | tar xz -C $HOME
 
 install:
   # Where to find libraries.
@@ -27,4 +36,24 @@ script:
   - stylish-haskell-lhs -i .
   - git diff --exit-code
   - stack --no-terminal test --coverage --extra-include-dirs=$HOME/.local/include --extra-lib-dirs=$HOME/.local/lib
-  - shc toxcore testsuite
+  - shc toxcore-c testsuite
+  - stack sdist --tar-dir .
+
+deploy:
+  provider: releases
+  token:
+    secure: "Q3NyBZiF2weHVcnx+34YfomLhkoM7pC1yxx+tokmgBeIH6fl3LuUx4ibPCuicBmHk3dRd8/bv3jR2bgSdCK730x8dbbQFC3QF69RIkDNPsqa6jZ5oSruC7V3gyeI6WDfVJqTjO4Co7f1k6KZxkuBQHpwNW/dmj4Wufs9Cie9f9cx477oxtxQEjL3mZ5GSkMYSkomWwLFnrRkAPw/736fgwH7IKSLFrFBWgj6QeSXUDUJero+v2lEvVjBtVAEekI1oofgBzXG3inD0+Zoh43+tvhpPq3FbgOUO0fi/6aXWwcC3cCln+NlAqnkZ7u6Fr4GPD3wJGPA2L/b8Mi74cR9oUDLkQiGqNhlQNuZJRjHAZDaD/I9nXgB7oF5JJ/+zFvSA5MiptFdvsIEUHaAo34ZacK1DvxomfcHTPWduWOowk07zlgrn3J1fH+rYEEIYWOpLiwtHufT3aJQoDm2tld8M4kbg10th1YhProgJNvECm2rj5LYci2szay4An31K+ltqFtJC9tfOMf8mTBBgxarzHoLqCR9QhqzC2U0+h2MyRfpuDVr/44Ikqeote8Em2OxMAG/Vy/YwO+bS9lB6pVmzE1wfbGbJYD5yTytkj6174jtqSXSrZkwgfWfjqs7kzHxVMhv/hJxP8NzuRfzahdAdiHdnoLrosXNTv2mtzzfbm4="
+  file: toxcore-c-0.2.11.tar.gz
+  skip_cleanup: true
+  on:
+    repo: TokTok/hs-toxcore-c
+    tags: true
+
+after_deploy:
+  - mkdir -p "$HOME/.stack/upload"
+  - echo "{\"username\":\"$HACKAGE_USERNAME\",\"password\":\"$HACKAGE_PASSWORD\"}" > $HOME/.stack/upload/credentials.json
+  - stack --no-terminal upload .
+
+# Only build pull requests and releases, don't build master on pushes,
+# except through api or cron.
+if: type IN (pull_request, api, cron) OR tag IS present

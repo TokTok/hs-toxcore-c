@@ -1,23 +1,23 @@
-name:                 toxcore
+name:                 toxcore-c
 synopsis:             Haskell bindings to the C reference implementation of Tox
-version:              0.2.0
+version:              0.2.11
 cabal-version:        >= 1.10
 license:              GPL-3
 license-file:         LICENSE
 build-type:           Simple
 author:               iphy
 maintainer:           iphy
-copyright:            © 2016-2018 iphy
+copyright:            © 2016-2020 The TokTok Team
 homepage:             https://toktok.github.io
 category:             Network
 description:
   Haskell bindings to the C reference implementation of Tox.
   .
-  See <https://github.com/TokTok/toxcore>.
+  See <https://github.com/TokTok/c-toxcore>.
 
 source-repository head
   type: git
-  location: https://github.com/TokTok/hs-toxcore
+  location: https://github.com/TokTok/hs-toxcore-c
 
 library
   default-language: Haskell2010
@@ -25,12 +25,7 @@ library
       src
   ghc-options:
       -Wall
-      -- -fno-warn-unused-imports
   extra-libraries: toxcore
-  build-depends:
-      base < 5
-    , bytestring
-    , data-default-class
   exposed-modules:
       Network.Tox.C
       Network.Tox.C.CEnum
@@ -40,6 +35,10 @@ library
       Network.Tox.C.Tox
       Network.Tox.C.Type
       Network.Tox.C.Version
+  build-depends:
+      base < 5
+    , bytestring
+    , data-default-class
 
 executable groupbot
   default-language: Haskell2010
@@ -49,13 +48,13 @@ executable groupbot
       -Wall
       -fno-warn-unused-imports
   extra-libraries: toxcore
+  main-is: Main.hs
   build-depends:
       base < 5
     , base16-bytestring
     , bytestring
     , directory
-    , toxcore
-  main-is: Main.hs
+    , toxcore-c
 
 test-suite testsuite
   default-language: Haskell2010
@@ -65,6 +64,10 @@ test-suite testsuite
   ghc-options:
       -Wall
       -fno-warn-unused-imports
+  main-is: testsuite.hs
+  other-modules:
+      Network.Tox.C.ToxSpec
+      Network.Tox.CSpec
   build-depends:
       base < 5
     , QuickCheck >= 2.9.1
@@ -74,8 +77,4 @@ test-suite testsuite
     , data-default-class
     , hspec
     , saltine
-    , toxcore
-  main-is: testsuite.hs
-  other-modules:
-      Network.Tox.C.ToxSpec
-      Network.Tox.CSpec
+    , toxcore-c
