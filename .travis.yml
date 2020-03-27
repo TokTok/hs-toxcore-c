@@ -16,43 +16,21 @@ cache:
     - $HOME/.local
     - $HOME/.stack
 
-before_install:
-  - export PATH=$HOME/.local/bin:$PATH
-  - travis_retry curl -L https://github.com/TokTok/hs-tools/releases/download/v0.6/hs-tools-v0.6.tar.gz | tar xz -C $HOME
-
-install:
-  # Where to find libraries.
-  - export LD_LIBRARY_PATH=$HOME/.local/lib
-  - export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
-  # libsodium
-  - git clone --depth=1 --branch=stable https://github.com/jedisct1/libsodium
-  - test -f $HOME/.local/lib/libsodium.so || (cd libsodium && ./configure --prefix=$HOME/.local && make install -j$(nproc))
-  # c-toxcore
-  - git clone --depth=1 https://github.com/TokTok/c-toxcore
-  - test -f $HOME/.local/lib/libtoxcore.so || (cd c-toxcore && cmake -B_build -H. -DCMAKE_INSTALL_PREFIX:PATH=$HOME/.local -DBUILD_TOXAV=0 && make -C_build install -j$(nproc))
-
 script:
-  - hlint .
-  - stylish-haskell-lhs -i .
-  - git diff --exit-code
-  - stack --no-terminal test --coverage --extra-include-dirs=$HOME/.local/include --extra-lib-dirs=$HOME/.local/lib
-  - shc toxcore-c testsuite
-  - stack sdist --tar-dir .
+  - bash <(travis_retry curl -s https://raw.githubusercontent.com/TokTok/hs-tools/master/bin/travis-haskell) script
+  - eval $(travis-haskell env)
 
 deploy:
   provider: releases
   token:
     secure: "Q3NyBZiF2weHVcnx+34YfomLhkoM7pC1yxx+tokmgBeIH6fl3LuUx4ibPCuicBmHk3dRd8/bv3jR2bgSdCK730x8dbbQFC3QF69RIkDNPsqa6jZ5oSruC7V3gyeI6WDfVJqTjO4Co7f1k6KZxkuBQHpwNW/dmj4Wufs9Cie9f9cx477oxtxQEjL3mZ5GSkMYSkomWwLFnrRkAPw/736fgwH7IKSLFrFBWgj6QeSXUDUJero+v2lEvVjBtVAEekI1oofgBzXG3inD0+Zoh43+tvhpPq3FbgOUO0fi/6aXWwcC3cCln+NlAqnkZ7u6Fr4GPD3wJGPA2L/b8Mi74cR9oUDLkQiGqNhlQNuZJRjHAZDaD/I9nXgB7oF5JJ/+zFvSA5MiptFdvsIEUHaAo34ZacK1DvxomfcHTPWduWOowk07zlgrn3J1fH+rYEEIYWOpLiwtHufT3aJQoDm2tld8M4kbg10th1YhProgJNvECm2rj5LYci2szay4An31K+ltqFtJC9tfOMf8mTBBgxarzHoLqCR9QhqzC2U0+h2MyRfpuDVr/44Ikqeote8Em2OxMAG/Vy/YwO+bS9lB6pVmzE1wfbGbJYD5yTytkj6174jtqSXSrZkwgfWfjqs7kzHxVMhv/hJxP8NzuRfzahdAdiHdnoLrosXNTv2mtzzfbm4="
-  file: toxcore-c-0.2.11.tar.gz
+  file: $PACKAGE-$VERSION.tar.gz
   skip_cleanup: true
   on:
     repo: TokTok/hs-toxcore-c
     tags: true
 
-after_deploy:
-  - mkdir -p "$HOME/.stack/upload"
-  - echo "{\"username\":\"$HACKAGE_USERNAME\",\"password\":\"$HACKAGE_PASSWORD\"}" > $HOME/.stack/upload/credentials.json
-  - stack --no-terminal upload .
+after_deploy: travis-haskell deploy
 
 # Only build pull requests and releases, don't build master on pushes,
 # except through api or cron.

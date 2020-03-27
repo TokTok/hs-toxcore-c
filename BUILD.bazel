@@ -3,20 +3,14 @@ load("@rules_haskell//haskell:defs.bzl", "haskell_binary", "haskell_library")
 load("//third_party/haskell/hspec-discover:build_defs.bzl", "hspec_test")
 load("//tools/project:build_defs.bzl", "project")
 
-VERSION = "0.2.11"
-
-project(
-    # TODO(iphydf): Make this package standard travis.
-    standard_travis = False,
-    version = VERSION,
-)
+project(standard_travis = True)
 
 haskell_library(
     name = "hs-toxcore-c",
     srcs = glob(["src/**/*.*hs"]),
     compiler_flags = ["-Wno-unused-imports"],
     src_strip_prefix = "src",
-    version = VERSION,
+    version = "0.2.11",
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",
