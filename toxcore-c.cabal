@@ -43,12 +43,12 @@ library
 executable groupbot
   default-language: Haskell2010
   hs-source-dirs:
-      tools/groupbot
+      tools
   ghc-options:
       -Wall
       -fno-warn-unused-imports
   extra-libraries: toxcore
-  main-is: Main.hs
+  main-is: groupbot.hs
   build-depends:
       base < 5
     , base16-bytestring

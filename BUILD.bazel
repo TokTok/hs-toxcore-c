@@ -1,5 +1,5 @@
 load("@ai_formation_hazel//tools:mangling.bzl", "hazel_library")
-load("@rules_haskell//haskell:defs.bzl", "haskell_binary", "haskell_library")
+load("@rules_haskell//haskell:defs.bzl", "haskell_library")
 load("//third_party/haskell/hspec-discover:build_defs.bzl", "hspec_test")
 load("//tools/project:build_defs.bzl", "project")
 
@@ -17,20 +17,6 @@ haskell_library(
         hazel_library("base"),
         hazel_library("bytestring"),
         hazel_library("data-default-class"),
-    ],
-)
-
-haskell_binary(
-    name = "groupbot",
-    srcs = ["tools/groupbot/Main.hs"],
-    compiler_flags = ["-Wno-unused-imports"],
-    src_strip_prefix = "tools/groupbot",
-    deps = [
-        ":hs-toxcore-c",
-        hazel_library("base"),
-        hazel_library("base16-bytestring"),
-        hazel_library("bytestring"),
-        hazel_library("directory"),
     ],
 )
 

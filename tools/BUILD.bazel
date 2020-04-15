@@ -1,0 +1,15 @@
+load("@ai_formation_hazel//tools:mangling.bzl", "hazel_library")
+load("@rules_haskell//haskell:defs.bzl", "haskell_binary")
+
+haskell_binary(
+    name = "groupbot",
+    srcs = ["groupbot.hs"],
+    compiler_flags = ["-Wno-unused-imports"],
+    deps = [
+        "//hs-toxcore-c",
+        hazel_library("base"),
+        hazel_library("base16-bytestring"),
+        hazel_library("bytestring"),
+        hazel_library("directory"),
+    ],
+)
