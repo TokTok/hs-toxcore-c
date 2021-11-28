@@ -52,7 +52,7 @@ options savedata = C.Options
   }
 
 
-getRight :: (Monad m, Show a) => Either a b -> m b
+getRight :: (MonadFail m, Show a) => Either a b -> m b
 getRight (Left  l) = fail $ show l
 getRight (Right r) = return r
 

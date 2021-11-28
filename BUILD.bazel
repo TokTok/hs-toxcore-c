@@ -30,7 +30,7 @@ hspec_test(
         hazel_library("base"),
         hazel_library("base16-bytestring"),
         hazel_library("bytestring"),
-        hazel_library("bytestring-arbitrary"),
+        hazel_library("cryptohash"),
         hazel_library("data-default-class"),
         hazel_library("hspec"),
         hazel_library("saltine"),

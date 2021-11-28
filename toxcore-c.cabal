@@ -66,6 +66,7 @@ test-suite testsuite
       -fno-warn-unused-imports
   main-is: testsuite.hs
   other-modules:
+      Data.ByteString.Arbitrary
       Network.Tox.C.ToxSpec
       Network.Tox.CSpec
   build-depends:
@@ -73,7 +74,7 @@ test-suite testsuite
     , QuickCheck >= 2.9.1
     , base16-bytestring
     , bytestring
-    , bytestring-arbitrary
+    , cryptohash
     , data-default-class
     , hspec
     , saltine
