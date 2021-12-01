@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module Data.ByteString.Arbitrary
 ( ArbByteString(..)
 , ArbByteString1M(..)

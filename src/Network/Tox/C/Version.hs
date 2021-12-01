@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData  #-}
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.Version where
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE StrictData                 #-}
 module Main (main) where
 
 import           Control.Concurrent      (threadDelay)

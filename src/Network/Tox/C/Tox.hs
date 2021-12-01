@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Safe       #-}
+{-# LANGUAGE StrictData #-}
 -- | Public core API for Tox clients.
 --
 -- Every function that can fail takes a function-specific error code pointer

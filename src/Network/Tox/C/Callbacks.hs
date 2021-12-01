@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module Network.Tox.C.Callbacks where
 
 import           Control.Exception  (bracket)
