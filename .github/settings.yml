@@ -12,6 +12,4 @@ branches:
     protection:
       required_status_checks:
         contexts:
-          - cirrus-ci
-          - Codacy Static Code Analysis
-          - code-review/reviewable
+          - "bazel-opt"
