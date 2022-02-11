@@ -1,6 +1,6 @@
 name:                 toxcore-c
 synopsis:             Haskell bindings to the C reference implementation of Tox
-version:              0.2.11
+version:              0.2.12
 cabal-version:        >= 1.10
 license:              GPL-3
 license-file:         LICENSE
@@ -50,8 +50,8 @@ executable groupbot
   extra-libraries: toxcore
   main-is: groupbot.hs
   build-depends:
-      base < 5
-    , base16-bytestring
+      base                      < 5
+    , base16-bytestring         >= 1
     , bytestring
     , directory
     , toxcore-c
@@ -70,8 +70,8 @@ test-suite testsuite
       Network.Tox.C.ToxSpec
       Network.Tox.CSpec
   build-depends:
-      base < 5
-    , QuickCheck >= 2.9.1
+      base                      < 5
+    , QuickCheck                >= 2.9.1
     , base16-bytestring
     , bytestring
     , cryptohash

@@ -19,15 +19,16 @@ import           System.Exit             (exitSuccess)
 import qualified Network.Tox.C           as C
 
 
-bootstrapKey :: BS.ByteString
-bootstrapKey =
-  fst . Base16.decode . fromString $
+bootstrapKey, masterKey :: BS.ByteString
+Right bootstrapKey =
+  Base16.decode . fromString $
     "15E9C309CFCB79FDDF0EBA057DABB49FE15F3803B1BFF06536AE2E5BA5E4690E"
+Right masterKey =
+  Base16.decode . fromString $
+    "040F75B5C8995F9525F9A8692A6C355286BBD3CF248C984560733421274F0365"
 
 isMasterKey :: BS.ByteString -> Bool
-isMasterKey key =
-  (key ==) . fst . Base16.decode . fromString $
-    "040F75B5C8995F9525F9A8692A6C355286BBD3CF248C984560733421274F0365"
+isMasterKey = (masterKey ==)
 
 botName :: String
 botName = "groupbot"

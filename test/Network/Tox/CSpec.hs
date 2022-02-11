@@ -21,8 +21,8 @@ import qualified Network.Tox.C           as C
 
 
 bootstrapKey :: BS.ByteString
-bootstrapKey =
-  fst . Base16.decode . fromString $
+Right bootstrapKey =
+  Base16.decode . fromString $
     "1C5293AEF2114717547B39DA8EA6F1E331E5E358B35F9B6B5F19317911C5F976"
 
 bootstrapHost :: String

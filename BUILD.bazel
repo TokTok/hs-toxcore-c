@@ -10,7 +10,7 @@ haskell_library(
     srcs = glob(["src/**/*.*hs"]),
     compiler_flags = ["-Wno-unused-imports"],
     src_strip_prefix = "src",
-    version = "0.2.11",
+    version = "0.2.12",
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",
