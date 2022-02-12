@@ -37,8 +37,12 @@ library
       Network.Tox.C.Version
   build-depends:
       base < 5
+    , QuickCheck
     , bytestring
     , data-default-class
+    , generic-arbitrary
+    , msgpack-binary
+    , quickcheck-instances
 
 executable groupbot
   default-language: Haskell2010
@@ -77,5 +81,6 @@ test-suite testsuite
     , cryptohash
     , data-default-class
     , hspec
+    , msgpack-binary
     , saltine
     , toxcore-c

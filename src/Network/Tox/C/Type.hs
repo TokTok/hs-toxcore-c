@@ -15,4 +15,7 @@ import           Foreign.StablePtr       (StablePtr)
 data ToxStruct a
 type Tox a = Ptr (ToxStruct a)
 
+data ToxEventsStruct
+type ToxEvents = Ptr ToxEventsStruct
+
 type UserData a = StablePtr (MVar a)

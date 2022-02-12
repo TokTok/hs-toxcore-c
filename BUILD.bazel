@@ -14,9 +14,13 @@ haskell_library(
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",
+        "//hs-msgpack-binary",
+        hazel_library("QuickCheck"),
         hazel_library("base"),
         hazel_library("bytestring"),
         hazel_library("data-default-class"),
+        hazel_library("generic-arbitrary"),
+        hazel_library("quickcheck-instances"),
     ],
 )
 
@@ -26,6 +30,7 @@ hspec_test(
     compiler_flags = ["-Wno-unused-imports"],
     deps = [
         ":hs-toxcore-c",
+        "//hs-msgpack-binary",
         hazel_library("QuickCheck"),
         hazel_library("base"),
         hazel_library("base16-bytestring"),

@@ -6,7 +6,6 @@ module Network.Tox.C.ToxSpec where
 import           Control.Applicative               ((<$>), (<*>))
 import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxPK, boxSK)
 import qualified Data.ByteString                   as BS
-import           Data.ByteString.Arbitrary         (fromABS)
 import           Data.Default.Class                (def)
 import           Test.Hspec
 import           Test.QuickCheck
@@ -23,10 +22,6 @@ instance Arbitrary C.ProxyType where
 instance Arbitrary C.SavedataType where
   shrink = genericShrink
   arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary BS.ByteString where
-  shrink bs = if BS.null bs then [] else BS.inits bs
-  arbitrary = fromABS <$> arbitrary
 
 -- | Ensure that the hostname has a chance of being valid.
 filterHost :: C.Options -> C.Options

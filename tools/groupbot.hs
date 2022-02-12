@@ -119,7 +119,7 @@ loop :: MVar ud -> C.Tox ud -> IO a
 loop ud tox =
   forever $ do
     C.toxIterate tox ud
-    interval <- C.tox_iteration_interval tox
+    interval <- C.toxIterationInterval tox
     threadDelay $ fromIntegral $ interval * 10000
 
 
