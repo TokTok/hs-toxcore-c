@@ -102,8 +102,8 @@ import           Foreign.Storable        (peek)
 import           System.Posix.Types      (EpochTime)
 
 import           Network.Tox.C.CEnum
-import           Network.Tox.C.Events
 import           Network.Tox.C.Constants
+import           Network.Tox.C.Events
 import           Network.Tox.C.Options
 import           Network.Tox.C.Type
 
@@ -409,10 +409,10 @@ toxEventsFromPtr evPtr = do
 toxEventsIterate :: Tox a -> IO (Either String [Event])
 toxEventsIterate tox = do
     callErrFun (tox_events_iterate tox True) >>= \case
-        Left err -> return $ Left $ show err
+        Left err    -> return $ Left $ show err
         Right evPtr -> toxEventsFromPtr evPtr
 
-    
+
 
 -- | Return the time in milliseconds before tox_iterate() should be called again
 -- for optimal performance.
