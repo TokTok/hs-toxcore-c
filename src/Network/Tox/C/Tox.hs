@@ -86,6 +86,8 @@ import           Control.Concurrent.MVar (MVar, modifyMVar_)
 import           Control.Exception       (bracket)
 import           Control.Monad           ((>=>))
 import qualified Data.ByteString         as BS
+import qualified Data.ByteString.Lazy    as LBS
+import qualified Data.MessagePack        as MP
 import           Data.Word               (Word16, Word32, Word64)
 import           Foreign.C.String        (CString, peekCStringLen, withCString,
                                           withCStringLen)
@@ -101,6 +103,7 @@ import           System.Posix.Types      (EpochTime)
 
 import           Network.Tox.C.CEnum
 import           Network.Tox.C.Constants
+import           Network.Tox.C.Events
 import           Network.Tox.C.Options
 import           Network.Tox.C.Type
 
@@ -362,11 +365,58 @@ selfConnectionStatusCb = wrapSelfConnectionStatusCb . callSelfConnectionStatusCb
 -- TODO: how long should a client wait before bootstrapping again?
 foreign import ccall tox_callback_self_connection_status :: Tox a -> FunPtr (CSelfConnectionStatusCb a) -> IO ()
 
+-- | Common error codes for all functions that set a piece of user-visible
+-- client information.
+data ErrEventsIterate
+  = ErrEventsIterateOk
+    -- The function returned successfully.
+
+  | ErrEventsIterateMalloc
+    -- The function failed to allocate enough memory to store the events.
+
+  | ErrEventsDecode
+    -- Failed to encode or decode events in msgpack.
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+
+foreign import ccall tox_events_init :: Tox a -> IO ()
+foreign import ccall tox_events_iterate :: Tox a -> Bool -> CErr ErrEventsIterate -> IO ToxEvents
+foreign import ccall tox_events_free :: ToxEvents -> IO ()
+
+foreign import ccall tox_events_bytes_size :: ToxEvents -> IO Word32
+foreign import ccall tox_events_get_bytes :: ToxEvents -> CString -> IO ()
+
+foreign import ccall tox_events_load :: CString -> Word32 -> IO ToxEvents
+
+toxEventsToPtr :: [Event] -> IO ToxEvents
+toxEventsToPtr events =
+    let encoded = MP.pack events in
+    BS.useAsCStringLen (LBS.toStrict encoded) $ \(ptr, len) ->
+        tox_events_load ptr (fromIntegral len)
+
+toxEventsFromPtr :: ToxEvents -> IO (Either String [Event])
+toxEventsFromPtr evPtr = do
+    bytes <- bracket (return evPtr) tox_events_free $ const $ do
+        len <- tox_events_bytes_size evPtr
+        allocaArray (fromIntegral len) $ \ptr -> do
+            tox_events_get_bytes evPtr ptr
+            BS.packCStringLen (ptr, fromIntegral len)
+    case MP.unpackEither $ LBS.fromStrict bytes of
+        Left err -> do
+            print (MP.unpackEither $ LBS.fromStrict bytes :: Either MP.DecodeError MP.Object)
+            return $ Left $ show err
+        Right ok -> return $ Right ok
+
+toxEventsIterate :: Tox a -> IO (Either String [Event])
+toxEventsIterate tox = do
+    callErrFun (tox_events_iterate tox True) >>= \case
+        Left err    -> return $ Left $ show err
+        Right evPtr -> toxEventsFromPtr evPtr
+
+
+
 -- | Return the time in milliseconds before tox_iterate() should be called again
 -- for optimal performance.
-foreign import ccall tox_iteration_interval :: Tox a -> IO Word32
-toxIterationInterval :: Tox a -> IO Word32
-toxIterationInterval = tox_iteration_interval
+foreign import ccall "tox_iteration_interval" toxIterationInterval :: Tox a -> IO Word32
 
 -- | The main loop that needs to be run in intervals of tox_iteration_interval()
 -- milliseconds.
