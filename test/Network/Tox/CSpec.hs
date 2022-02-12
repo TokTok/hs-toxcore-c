@@ -92,6 +92,6 @@ spec =
             while ((/= UserData 4321) <$> readMVar ud) $ do
               toxIterate ud tox
               putStrLn "tox_iterate"
-              interval <- C.tox_iteration_interval tox
+              interval <- C.toxIterationInterval tox
               threadDelay $ fromIntegral $ interval * 10000
             putStrLn "done"

@@ -39,6 +39,7 @@ library
       base < 5
     , bytestring
     , data-default-class
+    , msgpack-binary
 
 executable groupbot
   default-language: Haskell2010
