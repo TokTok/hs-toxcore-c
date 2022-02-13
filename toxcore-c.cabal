@@ -40,7 +40,7 @@ library
     , QuickCheck
     , bytestring
     , data-default-class
-    , generic-arbitrary
+    , generic-arbitrary         < 0.2
     , msgpack-binary
     , quickcheck-instances
 
