@@ -13,7 +13,6 @@ import           Data.String            (fromString)
 import qualified Data.Text.Encoding     as Text
 import qualified Data.Text.IO           as Text
 import           Data.Word              (Word32)
-import           Foreign.Storable       (Storable (..))
 import           System.Directory       (doesFileExist)
 import           System.Exit            (exitSuccess)
 
@@ -66,9 +65,9 @@ must = (getRight =<<)
 
 
 newtype UserData = UserData { groupNumber :: Word32 }
-    deriving (Eq, Storable, Read, Show)
+    deriving (Read, Show)
 
-handleEvent :: C.Tox a -> UserData -> Event -> IO UserData
+handleEvent :: C.Tox -> UserData -> Event -> IO UserData
 handleEvent tox ud@(UserData gn) = \case
     SelfConnectionStatus conn -> do
         putStrLn "SelfConnectionStatusCb"
@@ -120,7 +119,7 @@ handleEvent tox ud@(UserData gn) = \case
     _ -> return ud
 
 
-loop :: C.Tox a -> UserData -> IO ()
+loop :: C.Tox -> UserData -> IO ()
 loop tox ud = do
     interval <- C.toxIterationInterval tox
     threadDelay $ fromIntegral $ interval * 10000

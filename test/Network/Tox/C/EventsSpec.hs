@@ -5,24 +5,17 @@
 {-# LANGUAGE ViewPatterns               #-}
 module Network.Tox.C.EventsSpec where
 
-import           Control.Applicative     ((<$>))
-import           Control.Concurrent      (threadDelay)
-import           Control.Concurrent.MVar (MVar, newMVar, readMVar)
-import           Control.Exception       (bracket)
-import           Control.Monad           (when)
-import qualified Data.ByteString         as BS
-import qualified Data.ByteString.Base16  as Base16
-import           Data.List               (sort)
-import           Data.MessagePack        (Object (..))
-import qualified Data.MessagePack        as MP
-import           Data.String             (fromString)
-import           Foreign.StablePtr       (StablePtr, freeStablePtr,
-                                          newStablePtr)
-import           Foreign.Storable        (Storable (..))
+import           Control.Concurrent     (threadDelay)
+import qualified Data.ByteString        as BS
+import qualified Data.ByteString.Base16 as Base16
+import           Data.List              (sort)
+import           Data.MessagePack       (Object (..))
+import qualified Data.MessagePack       as MP
+import           Data.String            (fromString)
 import           Test.Hspec
 import           Test.QuickCheck
 
-import qualified Network.Tox.C           as C
+import qualified Network.Tox.C          as C
 import           Network.Tox.C.Events
 
 
@@ -64,7 +57,7 @@ processEvent SelfConnectionStatus{} = return True
 processEvent _                      = return False
 
 
-toxIterate :: C.Tox a -> IO ()
+toxIterate :: C.Tox -> IO ()
 toxIterate tox = do
     putStrLn "tox_iterate"
     interval <- C.toxIterationInterval tox

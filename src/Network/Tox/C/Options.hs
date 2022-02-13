@@ -4,7 +4,6 @@
 {-# LANGUAGE StrictData    #-}
 module Network.Tox.C.Options where
 
-import           Control.Applicative ((<$>))
 import           Control.Exception   (bracket)
 import           Data.ByteString     (ByteString)
 import qualified Data.ByteString     as BS

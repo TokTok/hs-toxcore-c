@@ -3,14 +3,11 @@
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.ToxSpec where
 
-import           Control.Applicative               ((<$>), (<*>))
 import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxPK, boxSK)
 import qualified Data.ByteString                   as BS
 import           Data.Default.Class                (def)
 import           Test.Hspec
 import           Test.QuickCheck
-import           Test.QuickCheck.Arbitrary         (arbitraryBoundedEnum,
-                                                    genericShrink)
 
 import qualified Network.Tox.C                     as C
 
