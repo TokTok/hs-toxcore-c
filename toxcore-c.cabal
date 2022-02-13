@@ -29,7 +29,6 @@ library
   exposed-modules:
       Network.Tox.C
       Network.Tox.C.CEnum
-      Network.Tox.C.Callbacks
       Network.Tox.C.Constants
       Network.Tox.C.Events
       Network.Tox.C.Options
@@ -59,6 +58,7 @@ executable groupbot
     , base16-bytestring         >= 1
     , bytestring
     , directory
+    , text
     , toxcore-c
 
 test-suite testsuite
