@@ -29,7 +29,6 @@ library
   exposed-modules:
       Network.Tox.C
       Network.Tox.C.CEnum
-      Network.Tox.C.Callbacks
       Network.Tox.C.Constants
       Network.Tox.C.Events
       Network.Tox.C.Options
