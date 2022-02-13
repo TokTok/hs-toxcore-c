@@ -4,15 +4,14 @@
 {-# LANGUAGE StrictData    #-}
 module Network.Tox.C.Options where
 
-import           Control.Applicative ((<$>))
 import           Control.Exception   (bracket)
 import           Data.ByteString     (ByteString)
 import qualified Data.ByteString     as BS
 import           Data.Default.Class  (Default (..))
-import           Data.Word           (Word16)
+import           Data.Word           (Word16, Word32)
 import           Foreign.C.String    (CString, peekCString, withCString)
 import           Foreign.C.Types     (CInt (..), CSize (..))
-import           Foreign.Ptr         (Ptr, nullPtr)
+import           Foreign.Ptr         (FunPtr, Ptr, nullPtr)
 import           GHC.Generics        (Generic)
 
 import           Network.Tox.C.CEnum
@@ -164,11 +163,38 @@ foreign import ccall tox_options_set_savedata_data    :: OptionsPtr -> CString -
 foreign import ccall tox_options_set_savedata_length  :: OptionsPtr -> CSize -> IO ()
 
 
-data ErrOptionsNew
-  = ErrOptionsNewOk
-    -- The function returned successfully.
+data LogLevel
+  = LogLevelTrace
+  | LogLevelDebug
+  | LogLevelInfo
+  | LogLevelWarning
+  | LogLevelError
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
-  | ErrOptionsNewMalloc
+logLevelName :: LogLevel -> Char
+logLevelName LogLevelTrace   = 'T'
+logLevelName LogLevelDebug   = 'D'
+logLevelName LogLevelInfo    = 'I'
+logLevelName LogLevelWarning = 'W'
+logLevelName LogLevelError   = 'E'
+
+type LogCb = Ptr () -> CEnum LogLevel -> CString -> Word32 -> CString -> CString -> Ptr () -> IO ()
+foreign import ccall tox_options_set_log_callback :: OptionsPtr -> FunPtr LogCb -> IO ()
+foreign import ccall "wrapper" wrapLogCb :: LogCb -> IO (FunPtr LogCb)
+
+logHandler :: LogCb
+logHandler _ cLevel cFile line cFunc cMsg _ = do
+    let level = fromCEnum cLevel
+    file <- peekCString cFile
+    func <- peekCString cFunc
+    msg <- peekCString cMsg
+    case level of
+        LogLevelTrace -> return ()
+        _ -> putStrLn $ logLevelName level : ' ' : file <> ":" <> show line <> "(" <> func <> "): " <> msg
+
+
+data ErrOptionsNew
+  = ErrOptionsNewMalloc
     -- The function was unable to allocate enough memory to store the internal
     -- structures for the Tox options object.
   deriving (Eq, Ord, Enum, Bounded, Read, Show)
@@ -277,6 +303,7 @@ saveToxOptions ptr =
       tox_options_set_savedata_type   ptr v8
       tox_options_set_savedata_data   ptr sd sl
       tox_options_set_savedata_length ptr sl
+      tox_options_set_log_callback    ptr =<< wrapLogCb logHandler
 
 
 -- | Fill in the 'Options' values into the 'OptionsPtr' and perform the IO
@@ -303,6 +330,7 @@ pokeToxOptions options ptr action =
         tox_options_set_savedata_type   ptr $ toCEnum $ savedataType options
         tox_options_set_savedata_data   ptr saveData saveLen
         tox_options_set_savedata_length ptr saveLen
+        tox_options_set_log_callback    ptr =<< wrapLogCb logHandler
         action
 
 

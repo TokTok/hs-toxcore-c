@@ -1,38 +1,20 @@
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StrictData                 #-}
-{-# LANGUAGE Trustworthy                #-}
-{-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE Trustworthy       #-}
+{-# LANGUAGE ViewPatterns      #-}
 module Network.Tox.C.EventsSpec where
 
-import           Control.Applicative     ((<$>))
-import           Control.Concurrent      (threadDelay)
-import           Control.Concurrent.MVar (MVar, newMVar, readMVar)
-import           Control.Exception       (bracket)
-import           Control.Monad           (when)
-import qualified Data.ByteString         as BS
-import qualified Data.ByteString.Base16  as Base16
-import           Data.List               (sort)
-import           Data.MessagePack        (Object (..))
-import qualified Data.MessagePack        as MP
-import           Data.String             (fromString)
-import           Foreign.StablePtr       (StablePtr, freeStablePtr,
-                                          newStablePtr)
-import           Foreign.Storable        (Storable (..))
+import           Control.Concurrent   (threadDelay)
+import           Control.Monad        (forM)
+import qualified Data.ByteString      as BS
+import           Data.List            (sort)
+import           Data.MessagePack     (Object (..))
+import qualified Data.MessagePack     as MP
 import           Test.Hspec
 import           Test.QuickCheck
 
-import qualified Network.Tox.C           as C
+import qualified Network.Tox.C        as C
 import           Network.Tox.C.Events
-
-
-bootstrapKey :: BS.ByteString
-Right bootstrapKey =
-  Base16.decode . fromString $
-    "8E7D0B859922EF569298B4D261A8CCB5FEA14FB91ED412A7603A585A25698832"
-
-bootstrapHost :: String
-bootstrapHost = "95.79.50.56"
 
 
 options :: C.Options
@@ -44,7 +26,7 @@ options = C.Options
   , C.proxyPort    = 0
   , C.startPort    = 33445
   , C.endPort      = 33545
-  , C.tcpPort      = 3128
+  , C.tcpPort      = 0
   , C.savedataType = C.SavedataTypeNone
   , C.savedataData = BS.empty
   }
@@ -64,42 +46,42 @@ processEvent SelfConnectionStatus{} = return True
 processEvent _                      = return False
 
 
-toxIterate :: C.Tox a -> IO ()
-toxIterate tox = do
-    putStrLn "tox_iterate"
-    interval <- C.toxIterationInterval tox
+toxIterate :: Int -> [C.Tox] -> IO ()
+toxIterate 0 _ = expectationFailure "could not bootstrap"
+toxIterate countdown toxes = do
+    interval <- foldr max 0 <$> mapM C.toxIterationInterval toxes
     threadDelay $ fromIntegral $ interval * 10000
 
-    events <- must $ C.toxEventsIterate tox
-    result <- mapM processEvent events
+    connected <- fmap and . forM toxes $ \tox -> do
+        events <- must $ C.toxEventsIterate tox
+        or <$> mapM processEvent events
 
-    if or result
+    if connected
        then putStrLn "connected"
-       else toxIterate tox
+       else toxIterate (countdown - 1) toxes
 
 
 spec :: Spec
 spec = do
-    describe "serialisation format" $ do
-        it "is linear encoding" $ do
+    describe "event serialisation format" $ do
+        it "is linear encoding" $
             MP.toObject MP.defaultConfig (FileChunkRequest 1 2 3 4)
                 `shouldBe` ObjectArray
                     [ ObjectWord 11
                     , ObjectArray
                         [ObjectWord 1,ObjectWord 2,ObjectWord 3,ObjectWord 4]]
 
-        it "can round-trip through toxcore" $ do
+        it "can round-trip through toxcore" $
             property $ \(sort -> events) -> do
                 events' <- C.toxEventsToPtr events >>= C.toxEventsFromPtr
                 sort <$> events' `shouldBe` Right events
 
-    describe "toxcore" $ do
+    describe "toxcore" $
         it "can bootstrap" $ do
-            putStrLn "bootstrap"
-            must $ C.withOptions options $ \optPtr ->
-                must $ C.withTox optPtr $ \tox -> do
-                    C.tox_events_init tox
-                    must $ C.toxBootstrap   tox bootstrapHost 33445 bootstrapKey
-                    must $ C.toxAddTcpRelay tox bootstrapHost 33445 bootstrapKey
+            must $ C.withTox options $ \tox1 ->
+                must $ C.withTox options $ \tox2 -> do
+                    bootstrapPort <- must $ C.toxSelfGetUdpPort tox1
+                    bootstrapKey <- C.toxSelfGetDhtId tox1
+                    must $ C.toxBootstrap tox2 "localhost" bootstrapPort bootstrapKey
 
-                    toxIterate tox
+                    toxIterate 100 [tox1, tox2]
