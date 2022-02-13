@@ -13,7 +13,6 @@ import           Data.String            (fromString)
 import qualified Data.Text.Encoding     as Text
 import qualified Data.Text.IO           as Text
 import           Data.Word              (Word32)
-import           Foreign.Storable       (Storable (..))
 import           System.Directory       (doesFileExist)
 import           System.Exit            (exitSuccess)
 
@@ -66,9 +65,9 @@ must = (getRight =<<)
 
 
 newtype UserData = UserData { groupNumber :: Word32 }
-    deriving (Eq, Storable, Read, Show)
+    deriving (Read, Show)
 
-handleEvent :: C.Tox a -> UserData -> Event -> IO UserData
+handleEvent :: C.Tox -> UserData -> Event -> IO UserData
 handleEvent tox ud@(UserData gn) = \case
     SelfConnectionStatus conn -> do
         putStrLn "SelfConnectionStatusCb"
@@ -120,7 +119,7 @@ handleEvent tox ud@(UserData gn) = \case
     _ -> return ud
 
 
-loop :: C.Tox a -> UserData -> IO ()
+loop :: C.Tox -> UserData -> IO ()
 loop tox ud = do
     interval <- C.toxIterationInterval tox
     threadDelay $ fromIntegral $ interval * 10000
@@ -134,17 +133,16 @@ main :: IO ()
 main = do
     exists <- doesFileExist savedataFilename
     loadedSavedata <- if exists then BS.readFile savedataFilename else return BS.empty
-    must $ C.withOptions (options loadedSavedata) $ \optPtr ->
-        must $ C.withTox optPtr $ \tox -> do
-            must $ C.toxBootstrap tox bootstrapHost 33445 bootstrapKey
+    tox <- must $ C.toxNew (options loadedSavedata)
+    must $ C.toxBootstrap tox bootstrapHost 33445 bootstrapKey
 
-            adr <- C.toxSelfGetAddress tox
-            putStrLn $ (BS.unpack . Base16.encode) adr
-            _ <- C.toxSelfSetName tox botName
-            gn <- getRight =<< C.toxConferenceNew tox
-            catch (loop tox (UserData gn)) $ \case
-                e@UserInterrupt -> throwIO e
-                _ -> do
-                    savedSavedata <- C.toxGetSavedata tox
-                    BS.writeFile savedataFilename savedSavedata
-                    exitSuccess
+    adr <- C.toxSelfGetAddress tox
+    putStrLn $ (BS.unpack . Base16.encode) adr
+    _ <- C.toxSelfSetName tox botName
+    gn <- getRight =<< C.toxConferenceNew tox
+    catch (loop tox (UserData gn)) $ \case
+        e@UserInterrupt -> throwIO e
+        _ -> do
+            savedSavedata <- C.toxGetSavedata tox
+            BS.writeFile savedataFilename savedSavedata
+            exitSuccess

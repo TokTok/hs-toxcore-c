@@ -4,7 +4,6 @@
 {-# LANGUAGE Trustworthy                #-}
 module Network.Tox.C.CEnum where
 
-import           Control.Applicative   ((<$>))
 import           Foreign.C.Types       (CInt)
 import           Foreign.Marshal.Alloc (alloca)
 import           Foreign.Ptr           (Ptr)
