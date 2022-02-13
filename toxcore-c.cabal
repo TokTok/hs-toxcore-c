@@ -39,7 +39,6 @@ library
       base < 5
     , QuickCheck
     , bytestring
-    , data-default-class
     , generic-arbitrary         < 0.2
     , msgpack-binary            >= 0.0.16
     , quickcheck-instances
@@ -79,7 +78,6 @@ test-suite testsuite
     , base16-bytestring
     , bytestring
     , cryptohash
-    , data-default-class
     , hspec
     , msgpack-binary
     , saltine

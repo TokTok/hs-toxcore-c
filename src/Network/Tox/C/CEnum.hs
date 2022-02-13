@@ -4,7 +4,6 @@
 {-# LANGUAGE Trustworthy                #-}
 module Network.Tox.C.CEnum where
 
-import           Control.Applicative   ((<$>))
 import           Foreign.C.Types       (CInt)
 import           Foreign.Marshal.Alloc (alloca)
 import           Foreign.Ptr           (Ptr)
@@ -32,7 +31,7 @@ callErrFun :: (Eq err, Enum err, Bounded err)
            => (CErr err -> IO r) -> IO (Either err r)
 callErrFun f = alloca $ \errPtr -> do
   res <- f errPtr
-  err <- toEnum . fromIntegral . unCEnum <$> peek errPtr
-  return $ if err /= minBound
-    then Left  err
+  err <- unCEnum <$> peek errPtr
+  return $ if err > 0
+    then Left . toEnum . fromIntegral $ err - 1
     else Right res
