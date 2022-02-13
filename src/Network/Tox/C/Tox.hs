@@ -200,7 +200,7 @@ withTox opts f =
 
   where
     mapErr (Left ErrOptionsNewMalloc) = Left ErrNewMalloc
-    mapErr (Right ok) = ok
+    mapErr (Right ok)                 = ok
 
 
 -- | Calculates the number of bytes required to store the tox instance with
