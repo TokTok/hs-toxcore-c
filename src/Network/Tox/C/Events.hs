@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Safe              #-}
 {-# LANGUAGE StrictData        #-}
 module Network.Tox.C.Events where
 
