@@ -992,7 +992,7 @@ data ErrFriendSendMessage
 foreign import ccall tox_friend_send_message :: ToxPtr -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrFriendSendMessage -> IO Word32
 callFriendSendMessage :: (ToxPtr -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrFriendSendMessage -> IO Word32) ->
                           Tox -> Word32 -> MessageType -> BS.ByteString -> IO (Either ErrFriendSendMessage Word32)
-callFriendSendMessage f tox fn messageType message = withForeignPtr tox $ \toxPtr -> 
+callFriendSendMessage f tox fn messageType message = withForeignPtr tox $ \toxPtr ->
     BS.useAsCStringLen message $ \(msgStr, msgLen) ->
         callErrFun $ f toxPtr fn (toCEnum messageType) msgStr (fromIntegral msgLen)
 
