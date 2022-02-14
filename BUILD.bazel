@@ -39,5 +39,6 @@ hspec_test(
         hazel_library("data-default-class"),
         hazel_library("hspec"),
         hazel_library("saltine"),
+        hazel_library("vector"),
     ],
 )

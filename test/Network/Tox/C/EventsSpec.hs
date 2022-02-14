@@ -16,6 +16,7 @@ import           Data.List               (sort)
 import           Data.MessagePack        (Object (..))
 import qualified Data.MessagePack        as MP
 import           Data.String             (fromString)
+import qualified Data.Vector             as V
 import           Foreign.StablePtr       (StablePtr, freeStablePtr,
                                           newStablePtr)
 import           Foreign.Storable        (Storable (..))
@@ -83,10 +84,10 @@ spec = do
     describe "serialisation format" $ do
         it "is linear encoding" $ do
             MP.toObject MP.defaultConfig (FileChunkRequest 1 2 3 4)
-                `shouldBe` ObjectArray
+                `shouldBe` ObjectArray (V.fromList
                     [ ObjectWord 11
-                    , ObjectArray
-                        [ObjectWord 1,ObjectWord 2,ObjectWord 3,ObjectWord 4]]
+                    , ObjectArray (V.fromList
+                        [ObjectWord 1,ObjectWord 2,ObjectWord 3,ObjectWord 4])])
 
         it "can round-trip through toxcore" $ do
             property $ \(sort -> events) -> do

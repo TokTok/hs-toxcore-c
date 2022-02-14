@@ -41,7 +41,7 @@ library
     , bytestring
     , data-default-class
     , generic-arbitrary         < 0.2
-    , msgpack-binary
+    , msgpack-binary            >= 0.0.16
     , quickcheck-instances
 
 executable groupbot
@@ -84,3 +84,4 @@ test-suite testsuite
     , msgpack-binary
     , saltine
     , toxcore-c
+    , vector
