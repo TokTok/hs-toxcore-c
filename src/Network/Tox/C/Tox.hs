@@ -693,7 +693,7 @@ toxFriendGetPublicKey tox fn =
         nameRes <- callErrFun $ tox_friend_get_public_key tox fn pkPtr
         case nameRes of
             Left err -> return $ Left err
-            Right _ -> Right <$> BS.packCStringLen (pkPtr, pkLen)
+            Right _  -> Right <$> BS.packCStringLen (pkPtr, pkLen)
 
 
 data ErrFriendGetLastOnline
@@ -817,7 +817,7 @@ toxFriendGetConnectionStatus tox fn =
 --   invalid. Inspect the error code to determine which case it is.
 foreign import ccall tox_friend_get_typing :: Tox -> Word32 -> CErr ErrFriendQuery -> IO Bool
 toxFriendGetTyping :: Tox -> Word32 -> IO (Either ErrFriendQuery Bool)
-toxFriendGetTyping tox fn = callErrFun $ tox_friend_get_typing tox fn 
+toxFriendGetTyping tox fn = callErrFun $ tox_friend_get_typing tox fn
 
 
 --------------------------------------------------------------------------------
@@ -1062,7 +1062,7 @@ toxFileGetFileId tox fn fileNum =
         idRes <- callErrFun $ tox_file_get_file_id tox fn fileNum fileIdPtr
         case idRes of
             Left err -> return $ Left err
-            Right _ -> Right <$> BS.packCStringLen (fileIdPtr, fileIdLen)
+            Right _  -> Right <$> BS.packCStringLen (fileIdPtr, fileIdLen)
 
 
 --------------------------------------------------------------------------------
@@ -1304,13 +1304,13 @@ toxConferencePeerGetPublicKey tox gn pn =
         nameRes <- callErrFun $ tox_conference_peer_get_public_key tox gn pn pkPtr
         case nameRes of
             Left err -> return $ Left err
-            Right _ -> Right <$> BS.packCStringLen (pkPtr, pkLen)
+            Right _  -> Right <$> BS.packCStringLen (pkPtr, pkLen)
 
 
 -- | Return true if passed peer_number corresponds to our own.
 foreign import ccall tox_conference_peer_number_is_ours :: Tox -> Word32 -> Word32 -> CErr ErrConferencePeerQuery -> IO Bool
 toxConferencePeerNumberIsOurs :: Tox -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery Bool)
-toxConferencePeerNumberIsOurs tox gn pn = callErrFun $ tox_conference_peer_number_is_ours tox gn pn 
+toxConferencePeerNumberIsOurs tox gn pn = callErrFun $ tox_conference_peer_number_is_ours tox gn pn
 
 
 data ErrConferenceInvite
