@@ -80,23 +80,32 @@
 --
 module Network.Tox.C.Tox where
 
-import           Control.Exception       (bracket)
-import           Control.Monad           ((>=>))
-import qualified Data.ByteString         as BS
-import qualified Data.ByteString.Lazy    as LBS
-import qualified Data.MessagePack        as MP
-import           Data.Word               (Word16, Word32, Word64)
-import           Foreign.C.String        (CString, withCString)
-import           Foreign.C.Types         (CInt (..), CSize (..), CTime (..))
-import           Foreign.Marshal.Array   (allocaArray, peekArray)
-import           Foreign.Ptr             (Ptr, nullPtr)
-import           System.Posix.Types      (EpochTime)
+import           Control.Exception        (bracket)
+import           Control.Monad            ((>=>))
+import qualified Data.ByteString          as BS
+import qualified Data.ByteString.Lazy     as LBS
+import qualified Data.MessagePack         as MP
+import           Data.Word                (Word16, Word32, Word64)
+import           Foreign.C.String         (CString, withCString)
+import           Foreign.C.Types          (CInt (..), CSize (..), CTime (..))
+import           Foreign.Marshal.Array    (allocaArray, peekArray)
+import           Foreign.Ptr              (Ptr, nullPtr)
+import           System.Posix.Types       (EpochTime)
 
 import           Network.Tox.C.CEnum
 import           Network.Tox.C.Constants
-import           Network.Tox.C.Events
 import           Network.Tox.C.Options
 import           Network.Tox.C.Type
+import           Network.Tox.Types.Events (Event)
+
+
+-- | The Tox instance type. All the state associated with a connection is held
+-- within the instance. Multiple instances can exist and operate concurrently.
+-- The maximum number of Tox instances that can exist on a single network device
+-- is limited. Note that this is not just a per-process limit, since the
+-- limiting factor is the number of usable ports on a device.
+data ToxStruct
+type Tox = Ptr ToxStruct
 
 
 --------------------------------------------------------------------------------

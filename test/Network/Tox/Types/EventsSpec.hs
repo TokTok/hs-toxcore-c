@@ -1,19 +1,19 @@
 {-# LANGUAGE StrictData   #-}
 {-# LANGUAGE Trustworthy  #-}
 {-# LANGUAGE ViewPatterns #-}
-module Network.Tox.C.EventsSpec where
+module Network.Tox.Types.EventsSpec where
 
-import           Control.Concurrent   (threadDelay)
-import           Control.Monad        (forM)
-import           Data.List            (sort)
-import           Data.MessagePack     (Object (..))
-import qualified Data.MessagePack     as MP
-import qualified Data.Vector          as V
+import           Control.Concurrent       (threadDelay)
+import           Control.Monad            (forM)
+import           Data.List                (sort)
+import           Data.MessagePack         (Object (..))
+import qualified Data.MessagePack         as MP
+import qualified Data.Vector              as V
 import           Test.Hspec
 import           Test.QuickCheck
 
-import qualified Network.Tox.C        as C
-import           Network.Tox.C.Events
+import qualified Network.Tox.C            as C
+import           Network.Tox.Types.Events
 
 
 getRight :: (MonadFail m, Show a) => Either a b -> m b

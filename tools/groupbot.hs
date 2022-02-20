@@ -1,22 +1,23 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE StrictData     #-}
 module Main (main) where
 
-import           Control.Concurrent     (threadDelay)
-import           Control.Exception      (AsyncException (UserInterrupt), catch,
-                                         throwIO)
-import           Control.Monad          (foldM)
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8  as BS
-import           Data.String            (fromString)
-import qualified Data.Text.Encoding     as Text
-import qualified Data.Text.IO           as Text
-import           Data.Word              (Word32)
-import           System.Directory       (doesFileExist)
-import           System.Exit            (exitSuccess)
+import           Control.Concurrent       (threadDelay)
+import           Control.Exception        (AsyncException (UserInterrupt),
+                                           catch, throwIO)
+import           Control.Monad            (foldM)
+import qualified Data.ByteString.Base16   as Base16
+import qualified Data.ByteString.Char8    as BS
+import           Data.String              (fromString)
+import qualified Data.Text.Encoding       as Text
+import qualified Data.Text.IO             as Text
+import           Data.Word                (Word32)
+import           System.Directory         (doesFileExist)
+import           System.Exit              (exitSuccess)
 
-import qualified Network.Tox.C          as C
-import           Network.Tox.C.Events
+import qualified Network.Tox.C            as C
+import           Network.Tox.Types.Events
 
 
 bootstrapKey, masterKey :: BS.ByteString
@@ -68,48 +69,48 @@ newtype UserData = UserData { groupNumber :: Word32 }
 
 handleEvent :: C.Tox -> UserData -> Event -> IO UserData
 handleEvent tox ud@(UserData gn) = \case
-    SelfConnectionStatus conn -> do
+    SelfConnectionStatus{ connectionStatus } -> do
         putStrLn "SelfConnectionStatusCb"
-        print conn
+        print connectionStatus
         return ud
 
-    FriendRequest (PublicKey pk) msg -> do
+    FriendRequest{ publicKey = C.FixedByteString pk, message } -> do
         putStrLn "FriendRequestCb"
         Right fn <- C.toxFriendAddNorequest tox pk
         putStrLn $ (BS.unpack . Base16.encode) pk
-        Text.putStrLn $ Text.decodeUtf8 msg
+        Text.putStrLn $ Text.decodeUtf8 message
         print fn
         return ud
 
-    FriendConnectionStatus fn status -> do
+    FriendConnectionStatus friendNumber status -> do
         putStrLn "FriendConnectionStatusCb"
-        print fn
+        print friendNumber
         print status
         if status /= C.ConnectionNone
             then do
                 putStrLn "Inviting!"
-                _ <- C.toxConferenceInvite tox fn gn
+                _ <- C.toxConferenceInvite tox friendNumber gn
                 return ()
             else
                 putStrLn "Friend offline"
         return ud
 
-    FriendMessage fn msgType msg -> do
+    FriendMessage{ friendNumber, messageType, message } -> do
         putStrLn "FriendMessage"
-        print fn
-        print msgType
-        Text.putStrLn $ Text.decodeUtf8 msg
-        _ <- C.toxFriendSendMessage tox fn msgType msg
+        print friendNumber
+        print messageType
+        Text.putStrLn $ Text.decodeUtf8 message
+        _ <- C.toxFriendSendMessage tox friendNumber messageType message
         return ud
 
-    ConferenceInvite fn _confType cookie -> do
+    ConferenceInvite{ friendNumber, cookie } -> do
         putStrLn "ConferenceInvite"
-        print fn
-        pk <- getRight =<< C.toxFriendGetPublicKey tox fn
+        print friendNumber
+        pk <- getRight =<< C.toxFriendGetPublicKey tox friendNumber
         if isMasterKey pk
             then do
                 putStrLn "Joining!"
-                newGn <- getRight =<< C.toxConferenceJoin tox fn cookie
+                newGn <- getRight =<< C.toxConferenceJoin tox friendNumber cookie
                 return $ UserData newGn
             else do
                 putStrLn "Not master!"

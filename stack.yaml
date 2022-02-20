@@ -6,3 +6,4 @@ extra-deps:
   - msgpack-arbitrary-0.1.0
   - msgpack-binary-0.0.16
   - msgpack-types-0.3.0
+  - schema-0.0.3
