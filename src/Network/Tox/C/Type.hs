@@ -1,22 +1,29 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE Safe          #-}
-{-# LANGUAGE StrictData    #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Safe              #-}
+{-# LANGUAGE StrictData        #-}
 module Network.Tox.C.Type where
 
+import qualified Data.ByteString           as BS
 import           Data.MessagePack          (MessagePack)
-import           Foreign.Ptr               (Ptr)
 import           GHC.Generics              (Generic)
+import           GHC.TypeNats              (Nat)
 import           Test.QuickCheck.Arbitrary (Arbitrary (..),
                                             arbitraryBoundedEnum)
 
 
--- | The Tox instance type. All the state associated with a connection is held
--- within the instance. Multiple instances can exist and operate concurrently.
--- The maximum number of Tox instances that can exist on a single network device
--- is limited. Note that this is not just a per-process limit, since the
--- limiting factor is the number of usable ports on a device.
-data ToxStruct
-type Tox = Ptr ToxStruct
+newtype FixedByteString (size :: Nat) = FixedByteString BS.ByteString
+    deriving (Ord, Eq, Show, Generic)
+
+instance MessagePack (FixedByteString size)
+
+instance Arbitrary (FixedByteString size) where
+    arbitrary = pure $ FixedByteString "00000000000000000000000000000000"
+
+
+type PublicKey = FixedByteString 32
 
 
 -- | Protocols that can be used to connect to the network or friends.
