@@ -32,10 +32,7 @@ processEvent _                      = return False
 
 toxIterate :: Int -> [C.Tox] -> IO ()
 toxIterate 0 _ =
-    -- TODO(iphydf): Once tox is stable enough to consistently bootstrap in
-    -- tests, uncomment this.
-    -- expectationFailure "could not bootstrap"
-    putStrLn "could not bootstrap"
+    expectationFailure "could not bootstrap"
 toxIterate countdown toxes = do
     interval <- foldr max 0 <$> mapM C.toxIterationInterval toxes
     threadDelay $ fromIntegral $ interval * 10000
@@ -70,6 +67,6 @@ spec = do
                 must $ C.withTox C.defaultOptions $ \tox2 -> do
                     bootstrapPort <- must $ C.toxSelfGetUdpPort tox1
                     bootstrapKey <- C.toxSelfGetDhtId tox1
-                    must $ C.toxBootstrap tox2 "localhost" bootstrapPort bootstrapKey
+                    must $ C.toxBootstrap tox2 "127.0.0.1" bootstrapPort bootstrapKey
 
                     toxIterate 100 [tox1, tox2]
