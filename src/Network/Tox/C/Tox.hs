@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE Safe       #-}
 {-# LANGUAGE StrictData #-}
 -- | Public core API for Tox clients.
 --

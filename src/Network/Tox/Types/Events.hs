@@ -1,5 +1,5 @@
+{-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE Safe          #-}
 {-# LANGUAGE StrictData    #-}
 module Network.Tox.Types.Events where
 

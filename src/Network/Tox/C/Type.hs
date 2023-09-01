@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE Safe              #-}
 {-# LANGUAGE StrictData        #-}
 module Network.Tox.C.Type where
 

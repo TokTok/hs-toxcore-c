@@ -3,15 +3,18 @@
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.ToxSpec where
 
-import qualified Crypto.Saltine.Internal.ByteSizes as Sodium (boxPK, boxSK)
-import qualified Data.ByteString                   as BS
+import qualified Data.ByteString as BS
 import           Test.Hspec
 import           Test.QuickCheck
 
-import qualified Network.Tox.C                     as C
+import qualified Network.Tox.C   as C
 
 {-# ANN module "HLint: ignore Reduce duplication" #-}
 {-# ANN module "HLint: ignore Redundant do" #-}
+
+boxPK, boxSK :: Int
+boxPK = 32
+boxSK = 32
 
 instance Arbitrary C.ProxyType where
     shrink = genericShrink
@@ -63,8 +66,8 @@ spec = do
 
     describe "Constants" $ do
         it "has constants equal to the hstox expected key size" $ do
-            fromIntegral C.tox_public_key_size `shouldBe` Sodium.boxPK
-            fromIntegral C.tox_secret_key_size `shouldBe` Sodium.boxSK
+            fromIntegral C.tox_public_key_size `shouldBe` boxPK
+            fromIntegral C.tox_secret_key_size `shouldBe` boxSK
             C.tox_address_size `shouldBe` C.tox_public_key_size + 6
             C.tox_max_name_length `shouldBe` 128
             C.tox_max_status_message_length `shouldBe` 1007

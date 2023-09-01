@@ -1,5 +1,4 @@
-{-# LANGUAGE StrictData  #-}
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE StrictData #-}
 module Network.Tox.C.Version where
 
 import           Data.Word (Word32)

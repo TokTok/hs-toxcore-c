@@ -1,5 +1,4 @@
-{-# LANGUAGE StrictData  #-}
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE StrictData #-}
 module Network.Tox.C.Constants where
 
 import           Data.Word (Word32)

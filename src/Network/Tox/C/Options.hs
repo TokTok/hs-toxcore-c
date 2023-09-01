@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE Safe          #-}
 {-# LANGUAGE StrictData    #-}
 module Network.Tox.C.Options where
 
