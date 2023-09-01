@@ -1,6 +1,7 @@
+{-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE Safe          #-}
 {-# LANGUAGE StrictData    #-}
+{-# LANGUAGE Trustworthy   #-}
 module Network.Tox.Types.Events where
 
 import qualified Data.ByteString                      as BS
