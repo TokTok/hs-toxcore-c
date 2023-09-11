@@ -98,6 +98,12 @@ import           Network.Tox.C.Type
 import           Network.Tox.Types.Events (Event)
 
 
+data ToxSystemStruct
+type ToxSystem = Ptr ToxSystemStruct
+
+foreign import ccall os_system :: IO ToxSystem
+
+
 -- | The Tox instance type. All the state associated with a connection is held
 -- within the instance. Multiple instances can exist and operate concurrently.
 -- The maximum number of Tox instances that can exist on a single network device
@@ -308,14 +314,15 @@ foreign import ccall tox_events_iterate :: Tox -> Bool -> CErr ErrEventsIterate 
 foreign import ccall tox_events_bytes_size :: ToxEvents -> IO Word32
 foreign import ccall tox_events_get_bytes :: ToxEvents -> CString -> IO ()
 
-foreign import ccall tox_events_load :: CString -> Word32 -> IO ToxEvents
+foreign import ccall tox_events_load :: ToxSystem -> CString -> Word32 -> IO ToxEvents
 foreign import ccall tox_events_free :: ToxEvents -> IO ()
 
 toxEventsToPtr :: [Event] -> IO ToxEvents
-toxEventsToPtr events =
-    let encoded = MP.pack events in
+toxEventsToPtr events = do
+    let encoded = MP.pack events
+    sys <- os_system
     BS.useAsCStringLen (LBS.toStrict encoded) $ \(ptr, len) ->
-        tox_events_load ptr (fromIntegral len)
+        tox_events_load sys ptr (fromIntegral len)
 
 toxEventsFromPtr :: ToxEvents -> IO (Either String [Event])
 toxEventsFromPtr evPtr = do
