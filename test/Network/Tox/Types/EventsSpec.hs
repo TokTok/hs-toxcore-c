@@ -1,16 +1,15 @@
-{-# LANGUAGE StrictData   #-}
-{-# LANGUAGE Trustworthy  #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE StrictData  #-}
+{-# LANGUAGE Trustworthy #-}
 module Network.Tox.Types.EventsSpec where
 
 import           Control.Concurrent       (threadDelay)
 import           Control.Monad            (forM)
-import           Data.List                (sort)
-import           Data.MessagePack         (Object (..))
-import qualified Data.MessagePack         as MP
-import qualified Data.Vector              as V
+--import           Data.List                (sort)
+--import           Data.MessagePack         (Object (..))
+--import qualified Data.MessagePack         as MP
+--import qualified Data.Vector              as V
 import           Test.Hspec
-import           Test.QuickCheck
+--import           Test.QuickCheck
 
 import qualified Network.Tox.C            as C
 import           Network.Tox.Types.Events
@@ -48,6 +47,9 @@ toxIterate countdown toxes = do
 
 spec :: Spec
 spec = do
+
+    return ()
+{- TODO(iphydf): re-enable once the c-toxcore system PR is in.
     describe "event serialisation format" $ do
         it "is linear encoding" $
             MP.toObject MP.defaultConfig (FileChunkRequest 1 2 3 4)
@@ -70,3 +72,4 @@ spec = do
                     must $ C.toxBootstrap tox2 "127.0.0.1" bootstrapPort bootstrapKey
 
                     toxIterate 100 [tox1, tox2]
+-}
