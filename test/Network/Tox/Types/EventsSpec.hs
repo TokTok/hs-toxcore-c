@@ -48,7 +48,6 @@ toxIterate countdown toxes = do
 spec :: Spec
 spec = do
 
-    return ()
 {- TODO(iphydf): re-enable once the c-toxcore system PR is in.
     describe "event serialisation format" $ do
         it "is linear encoding" $
@@ -62,6 +61,7 @@ spec = do
             property $ \(sort -> events) -> do
                 events' <- C.toxEventsToPtr events >>= C.toxEventsFromPtr
                 sort <$> events' `shouldBe` Right events
+-}
 
     describe "toxcore" $
         it "can bootstrap" $ do
@@ -72,4 +72,3 @@ spec = do
                     must $ C.toxBootstrap tox2 "127.0.0.1" bootstrapPort bootstrapKey
 
                     toxIterate 100 [tox1, tox2]
--}

@@ -1,4 +1,3 @@
-load("@ai_formation_hazel//tools:mangling.bzl", "hazel_library")
 load("@rules_haskell//haskell:defs.bzl", "haskell_library")
 load("//third_party/haskell/hspec-discover:build_defs.bzl", "hspec_test")
 load("//tools/project:build_defs.bzl", "project")
@@ -14,11 +13,11 @@ haskell_library(
     deps = [
         "//c-toxcore",
         "//hs-msgpack-binary",
-        hazel_library("QuickCheck"),
-        hazel_library("base"),
-        hazel_library("bytestring"),
-        hazel_library("generic-arbitrary"),
-        hazel_library("quickcheck-instances"),
+        "//third_party/haskell:QuickCheck",
+        "//third_party/haskell:base",
+        "//third_party/haskell:bytestring",
+        "//third_party/haskell:generic-arbitrary",
+        "//third_party/haskell:quickcheck-instances",
     ],
 )
 
@@ -28,13 +27,13 @@ hspec_test(
     deps = [
         ":hs-toxcore-c",
         "//hs-msgpack-binary",
-        hazel_library("QuickCheck"),
-        hazel_library("base"),
-        hazel_library("base16-bytestring"),
-        hazel_library("bytestring"),
-        hazel_library("cryptohash"),
-        hazel_library("hspec"),
-        hazel_library("saltine"),
-        hazel_library("vector"),
+        "//third_party/haskell:QuickCheck",
+        "//third_party/haskell:base",
+        "//third_party/haskell:base16-bytestring",
+        "//third_party/haskell:bytestring",
+        "//third_party/haskell:cryptohash",
+        "//third_party/haskell:hspec",
+        "//third_party/haskell:saltine",
+        "//third_party/haskell:vector",
     ],
 )
