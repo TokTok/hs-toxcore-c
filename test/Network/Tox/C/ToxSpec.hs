@@ -16,14 +16,6 @@ boxPK, boxSK :: Int
 boxPK = 32
 boxSK = 32
 
-instance Arbitrary C.ProxyType where
-    shrink = genericShrink
-    arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary C.SavedataType where
-    shrink = genericShrink
-    arbitrary = arbitraryBoundedEnum
-
 -- | Ensure that the hostname has a chance of being valid.
 filterHost :: C.Options -> C.Options
 filterHost o@C.Options{C.proxyHost = h} = o{C.proxyHost = filter (`elem` hostChars) h}

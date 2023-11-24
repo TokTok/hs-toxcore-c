@@ -29,7 +29,7 @@ processEvent SelfConnectionStatus{} = return True
 processEvent _                      = return False
 
 
-toxIterate :: Int -> [C.Tox] -> IO ()
+toxIterate :: Int -> [C.ToxPtr] -> IO ()
 toxIterate 0 _ =
     expectationFailure "could not bootstrap"
 toxIterate countdown toxes = do
@@ -69,6 +69,6 @@ spec = do
                 must $ C.withTox C.defaultOptions $ \tox2 -> do
                     bootstrapPort <- must $ C.toxSelfGetUdpPort tox1
                     bootstrapKey <- C.toxSelfGetDhtId tox1
-                    must $ C.toxBootstrap tox2 "127.0.0.1" bootstrapPort bootstrapKey
+                    _ <- must $ C.toxBootstrap tox2 "127.0.0.1" bootstrapPort bootstrapKey
 
                     toxIterate 100 [tox1, tox2]

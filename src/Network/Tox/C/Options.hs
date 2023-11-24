@@ -3,44 +3,46 @@
 {-# LANGUAGE StrictData    #-}
 module Network.Tox.C.Options where
 
-import           Control.Exception   (bracket)
-import           Data.ByteString     (ByteString)
-import qualified Data.ByteString     as BS
-import           Data.Word           (Word16, Word32)
-import           Foreign.C.String    (CString, peekCString, withCString)
-import           Foreign.C.Types     (CInt (..), CSize (..))
-import           Foreign.Ptr         (FunPtr, Ptr, nullPtr)
-import           GHC.Generics        (Generic)
+import           Control.Exception (bracket)
+import           Data.ByteString   (ByteString)
+import qualified Data.ByteString   as BS
+import           Data.Word         (Word16)
+import           Foreign.C.Enum
+import           Foreign.C.String  (peekCString, withCString)
+import           Foreign.Ptr       (nullPtr)
+import           GHC.Generics      (Generic)
 
-import           Network.Tox.C.CEnum
+import           FFI.Tox.Tox       (LogCb, LogLevel (..), OptionsPtr,
+                                    ProxyType (..), SavedataType (..),
+                                    tox_options_get_end_port,
+                                    tox_options_get_ipv6_enabled,
+                                    tox_options_get_proxy_host,
+                                    tox_options_get_proxy_port,
+                                    tox_options_get_proxy_type,
+                                    tox_options_get_savedata_data,
+                                    tox_options_get_savedata_length,
+                                    tox_options_get_savedata_type,
+                                    tox_options_get_start_port,
+                                    tox_options_get_tcp_port,
+                                    tox_options_get_udp_enabled,
+                                    tox_options_set_end_port,
+                                    tox_options_set_ipv6_enabled,
+                                    tox_options_set_log_callback,
+                                    tox_options_set_proxy_host,
+                                    tox_options_set_proxy_port,
+                                    tox_options_set_proxy_type,
+                                    tox_options_set_savedata_data,
+                                    tox_options_set_savedata_length,
+                                    tox_options_set_savedata_type,
+                                    tox_options_set_start_port,
+                                    tox_options_set_tcp_port,
+                                    tox_options_set_udp_enabled, wrapLogCb)
 
 --------------------------------------------------------------------------------
 --
 -- :: Startup options
 --
 --------------------------------------------------------------------------------
-
-
--- | Type of proxy used to connect to TCP relays.
-data ProxyType
-    = ProxyTypeNone
-      -- Don't use a proxy.
-    | ProxyTypeHttp
-      -- HTTP proxy using CONNECT.
-    | ProxyTypeSocks5
-      -- SOCKS proxy for simple socket pipes.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-
-
--- Type of savedata to create the Tox instance from.
-data SavedataType
-    = SavedataTypeNone
-      -- No savedata.
-    | SavedataTypeToxSave
-      -- Savedata is one that was obtained from tox_get_savedata
-    | SavedataTypeSecretKey
-      -- Savedata is a secret key of length 'tox_secret_key_size'
-    deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
 
 
 -- This struct contains all the startup options for Tox. You can either allocate
@@ -132,53 +134,12 @@ defaultOptions = Options
     }
 
 
-data OptionsStruct
-type OptionsPtr = Ptr OptionsStruct
-
-
-foreign import ccall tox_options_get_ipv6_enabled     :: OptionsPtr -> IO Bool
-foreign import ccall tox_options_get_udp_enabled      :: OptionsPtr -> IO Bool
-foreign import ccall tox_options_get_proxy_type       :: OptionsPtr -> IO (CEnum ProxyType)
-foreign import ccall tox_options_get_proxy_host       :: OptionsPtr -> IO CString
-foreign import ccall tox_options_get_proxy_port       :: OptionsPtr -> IO Word16
-foreign import ccall tox_options_get_start_port       :: OptionsPtr -> IO Word16
-foreign import ccall tox_options_get_end_port         :: OptionsPtr -> IO Word16
-foreign import ccall tox_options_get_tcp_port         :: OptionsPtr -> IO Word16
-foreign import ccall tox_options_get_savedata_type    :: OptionsPtr -> IO (CEnum SavedataType)
-foreign import ccall tox_options_get_savedata_data    :: OptionsPtr -> IO CString
-foreign import ccall tox_options_get_savedata_length  :: OptionsPtr -> IO CSize
-
-foreign import ccall tox_options_set_ipv6_enabled     :: OptionsPtr -> Bool -> IO ()
-foreign import ccall tox_options_set_udp_enabled      :: OptionsPtr -> Bool -> IO ()
-foreign import ccall tox_options_set_proxy_type       :: OptionsPtr -> CEnum ProxyType -> IO ()
-foreign import ccall tox_options_set_proxy_host       :: OptionsPtr -> CString -> IO ()
-foreign import ccall tox_options_set_proxy_port       :: OptionsPtr -> Word16 -> IO ()
-foreign import ccall tox_options_set_start_port       :: OptionsPtr -> Word16 -> IO ()
-foreign import ccall tox_options_set_end_port         :: OptionsPtr -> Word16 -> IO ()
-foreign import ccall tox_options_set_tcp_port         :: OptionsPtr -> Word16 -> IO ()
-foreign import ccall tox_options_set_savedata_type    :: OptionsPtr -> CEnum SavedataType -> IO ()
-foreign import ccall tox_options_set_savedata_data    :: OptionsPtr -> CString -> CSize -> IO ()
-foreign import ccall tox_options_set_savedata_length  :: OptionsPtr -> CSize -> IO ()
-
-
-data LogLevel
-    = LogLevelTrace
-    | LogLevelDebug
-    | LogLevelInfo
-    | LogLevelWarning
-    | LogLevelError
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
 logLevelName :: LogLevel -> Char
 logLevelName LogLevelTrace   = 'T'
 logLevelName LogLevelDebug   = 'D'
 logLevelName LogLevelInfo    = 'I'
 logLevelName LogLevelWarning = 'W'
 logLevelName LogLevelError   = 'E'
-
-type LogCb = Ptr () -> CEnum LogLevel -> CString -> Word32 -> CString -> CString -> Ptr () -> IO ()
-foreign import ccall tox_options_set_log_callback :: OptionsPtr -> FunPtr LogCb -> IO ()
-foreign import ccall "wrapper" wrapLogCb :: LogCb -> IO (FunPtr LogCb)
 
 logHandler :: LogCb
 logHandler _ cLevel cFile line cFunc cMsg _ = do

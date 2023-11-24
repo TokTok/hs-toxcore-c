@@ -1,19 +1,6 @@
 load("@rules_haskell//haskell:defs.bzl", "haskell_binary")
 
 haskell_binary(
-    name = "gen-struct",
-    srcs = ["gen-struct.hs"],
-    deps = [
-        "//hs-schema",
-        "//hs-toxcore-c",
-        "//third_party/haskell:base",
-        "//third_party/haskell:bytestring",
-        "//third_party/haskell:data-fix",
-        "//third_party/haskell:groom",
-    ],
-)
-
-haskell_binary(
     name = "groupbot",
     srcs = ["groupbot.hs"],
     deps = [

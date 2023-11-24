@@ -6,11 +6,11 @@ module Network.Tox.Types.Events where
 import qualified Data.ByteString                      as BS
 import           Data.MessagePack                     (MessagePack)
 import           Data.Word                            (Word16, Word32, Word64)
-import           GHC.Generics                         (Generic)
-import           Network.Tox.C.Type                   (ConferenceType,
+import           FFI.Tox.Tox                          (ConferenceType,
                                                        Connection, FileControl,
-                                                       MessageType, PublicKey,
-                                                       UserStatus)
+                                                       MessageType, UserStatus)
+import           GHC.Generics                         (Generic)
+import           Network.Tox.C.Type                   (PublicKey)
 import           Test.QuickCheck.Arbitrary            (Arbitrary (..))
 import           Test.QuickCheck.Arbitrary.Generic    (genericArbitrary,
                                                        genericShrink)

@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StrictData                 #-}
-module Network.Tox.C.CEnum where
+module Foreign.C.Enum where
 
 import           Foreign.C.Types       (CInt)
 import           Foreign.Marshal.Alloc (alloca)

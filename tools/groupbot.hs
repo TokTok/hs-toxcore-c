@@ -68,7 +68,7 @@ must = (getRight =<<)
 newtype UserData = UserData { groupNumber :: Word32 }
     deriving (Read, Show)
 
-handleEvent :: C.Tox -> UserData -> Event -> IO UserData
+handleEvent :: C.ToxPtr -> UserData -> Event -> IO UserData
 handleEvent tox ud@(UserData gn) = \case
     SelfConnectionStatus{ connectionStatus } -> do
         putStrLn "SelfConnectionStatusCb"
@@ -120,7 +120,7 @@ handleEvent tox ud@(UserData gn) = \case
     _ -> return ud
 
 
-loop :: C.Tox -> UserData -> IO ()
+loop :: C.ToxPtr -> UserData -> IO ()
 loop tox ud = do
     interval <- C.toxIterationInterval tox
     threadDelay $ fromIntegral $ interval * 10000
@@ -135,7 +135,7 @@ main = do
     exists <- doesFileExist savedataFilename
     loadedSavedata <- if exists then BS.readFile savedataFilename else return BS.empty
     must $ C.withTox (options loadedSavedata) $ \tox -> do
-        must $ C.toxBootstrap tox bootstrapHost 33445 bootstrapKey
+        _ <- must $ C.toxBootstrap tox bootstrapHost 33445 bootstrapKey
 
         adr <- C.toxSelfGetAddress tox
         putStrLn $ (BS.unpack . Base16.encode) adr

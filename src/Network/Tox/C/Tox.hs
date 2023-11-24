@@ -85,26 +85,97 @@ import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Lazy     as LBS
 import qualified Data.MessagePack         as MP
 import           Data.Word                (Word16, Word32, Word64)
+import           Foreign.C.Enum
 import           Foreign.C.String         (CString, withCString)
-import           Foreign.C.Types          (CInt (..), CSize (..), CTime (..))
+import           Foreign.C.Types          (CTime (..))
 import           Foreign.Marshal.Array    (allocaArray, peekArray)
 import           Foreign.Ptr              (Ptr, nullPtr)
 import           System.Posix.Types       (EpochTime)
 
-import           Network.Tox.C.CEnum
+import           FFI.Tox.Tox              (ConferenceType, Connection,
+                                           ErrBootstrap (..),
+                                           ErrConferenceDelete (..),
+                                           ErrConferenceGetType (..),
+                                           ErrConferenceInvite (..),
+                                           ErrConferenceJoin (..),
+                                           ErrConferenceNew (..),
+                                           ErrConferencePeerQuery (..),
+                                           ErrConferenceSendMessage (..),
+                                           ErrConferenceTitle (..),
+                                           ErrFileControl (..), ErrFileGet (..),
+                                           ErrFileSeek (..), ErrFileSend (..),
+                                           ErrFileSendChunk (..),
+                                           ErrFriendAdd (..),
+                                           ErrFriendByPublicKey (..),
+                                           ErrFriendCustomPacket (..),
+                                           ErrFriendDelete (..),
+                                           ErrFriendGetLastOnline (..),
+                                           ErrFriendGetPublicKey (..),
+                                           ErrFriendQuery (..),
+                                           ErrFriendSendMessage (..),
+                                           ErrGetPort (..), ErrNew (..),
+                                           ErrSetInfo (..), ErrSetTyping (..),
+                                           FileControl, FileKind (..),
+                                           MessageType, ToxPtr, UserStatus,
+                                           tox_add_tcp_relay, tox_bootstrap,
+                                           tox_conference_delete,
+                                           tox_conference_get_chatlist,
+                                           tox_conference_get_chatlist_size,
+                                           tox_conference_get_title,
+                                           tox_conference_get_title_size,
+                                           tox_conference_get_type,
+                                           tox_conference_invite,
+                                           tox_conference_join,
+                                           tox_conference_new,
+                                           tox_conference_peer_count,
+                                           tox_conference_peer_get_name,
+                                           tox_conference_peer_get_name_size,
+                                           tox_conference_peer_get_public_key,
+                                           tox_conference_peer_number_is_ours,
+                                           tox_conference_send_message,
+                                           tox_conference_set_title,
+                                           tox_file_control,
+                                           tox_file_get_file_id, tox_file_seek,
+                                           tox_file_send, tox_file_send_chunk,
+                                           tox_friend_add,
+                                           tox_friend_add_norequest,
+                                           tox_friend_by_public_key,
+                                           tox_friend_delete, tox_friend_exists,
+                                           tox_friend_get_connection_status,
+                                           tox_friend_get_last_online,
+                                           tox_friend_get_name,
+                                           tox_friend_get_name_size,
+                                           tox_friend_get_public_key,
+                                           tox_friend_get_status_message,
+                                           tox_friend_get_status_message_size,
+                                           tox_friend_get_typing,
+                                           tox_friend_send_lossless_packet,
+                                           tox_friend_send_lossy_packet,
+                                           tox_friend_send_message,
+                                           tox_get_savedata,
+                                           tox_get_savedata_size, tox_hash,
+                                           tox_iteration_interval, tox_kill,
+                                           tox_new, tox_self_get_address,
+                                           tox_self_get_dht_id,
+                                           tox_self_get_friend_list,
+                                           tox_self_get_friend_list_size,
+                                           tox_self_get_name,
+                                           tox_self_get_name_size,
+                                           tox_self_get_nospam,
+                                           tox_self_get_public_key,
+                                           tox_self_get_secret_key,
+                                           tox_self_get_status_message,
+                                           tox_self_get_status_message_size,
+                                           tox_self_get_tcp_port,
+                                           tox_self_get_udp_port,
+                                           tox_self_set_name,
+                                           tox_self_set_nospam,
+                                           tox_self_set_status,
+                                           tox_self_set_status_message,
+                                           tox_self_set_typing)
 import           Network.Tox.C.Constants
 import           Network.Tox.C.Options
-import           Network.Tox.C.Type
 import           Network.Tox.Types.Events (Event)
-
-
--- | The Tox instance type. All the state associated with a connection is held
--- within the instance. Multiple instances can exist and operate concurrently.
--- The maximum number of Tox instances that can exist on a single network device
--- is limited. Note that this is not just a per-process limit, since the
--- limiting factor is the number of usable ports on a device.
-data ToxStruct
-type Tox = Ptr ToxStruct
 
 
 --------------------------------------------------------------------------------
@@ -126,70 +197,7 @@ type Tox = Ptr ToxStruct
 --
 --------------------------------------------------------------------------------
 
-
-data ErrNew
-    = ErrNewNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrNewMalloc
-      -- The function was unable to allocate enough memory to store the internal
-      -- structures for the Tox object.
-
-    | ErrNewPortAlloc
-      -- The function was unable to bind to a port. This may mean that all ports
-      -- have already been bound, e.g. by other Tox instances, or it may mean a
-      -- permission error. You may be able to gather more information from errno.
-
-    | ErrNewProxyBadType
-      -- proxy_type was invalid.
-
-    | ErrNewProxyBadHost
-      -- proxy_type was valid but the proxy_host passed had an invalid format or
-      -- was 'nullPtr'.
-
-    | ErrNewProxyBadPort
-      -- proxy_type was valid, but the proxy_port was invalid.
-
-    | ErrNewProxyNotFound
-      -- The proxy address passed could not be resolved.
-
-    | ErrNewLoadEncrypted
-      -- The byte array to be loaded contained an encrypted save.
-
-    | ErrNewLoadBadFormat
-      -- The data format was invalid. This can happen when loading data that was
-      -- saved by an older version of Tox, or when the data has been corrupted.
-      -- When loading from badly formatted data, some data may have been loaded,
-      -- and the rest is discarded. Passing an invalid length parameter also
-      -- causes this error.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
--- @brief Creates and initialises a new Tox instance with the options passed.
---
--- This function will bring the instance into a valid state. Running the event
--- loop with a new instance will operate correctly.
---
--- If loading failed or succeeded only partially, the new or partially loaded
--- instance is returned and an error code is set.
---
--- @param options An options object as described above. If this parameter is
---   'nullPtr', the default options are used.
---
--- @see tox_iterate for the event loop.
---
--- @return A new Tox instance pointer on success or 'nullPtr' on failure.
-foreign import ccall tox_new :: OptionsPtr -> CErr ErrNew -> IO Tox
-
--- | Releases all resources associated with the Tox instance and disconnects
--- from the network.
---
--- After calling this function, the Tox pointer becomes invalid. No other
--- functions can be called, and the pointer value can no longer be read.
-foreign import ccall tox_kill :: Tox -> IO ()
-
-withTox :: Options -> (Tox -> IO a) -> IO (Either ErrNew a)
+withTox :: Options -> (ToxPtr -> IO a) -> IO (Either ErrNew a)
 withTox opts f =
     fmap mapErr . withOptions opts $ \copts -> do
         result <- callErrFun . tox_new $ copts
@@ -206,22 +214,7 @@ withTox opts f =
     mapErr (Left ErrOptionsNewMalloc) = Left ErrNewMalloc
     mapErr (Right ok)                 = ok
 
-
--- | Calculates the number of bytes required to store the tox instance with
--- tox_get_savedata. This function cannot fail. The result is always greater
--- than 0.
---
--- @see threading for concurrency implications.
-foreign import ccall tox_get_savedata_size :: Tox -> IO CSize
-
--- | Store all information associated with the tox instance to a byte array.
---
--- @param data A memory region large enough to store the tox instance data.
---   Call tox_get_savedata_size to find the number of bytes required. If this
---   parameter is 'nullPtr', this function has no effect.
-foreign import ccall tox_get_savedata :: Tox -> CString -> IO ()
-
-toxGetSavedata :: Tox -> IO BS.ByteString
+toxGetSavedata :: ToxPtr -> IO BS.ByteString
 toxGetSavedata tox = do
     savedataLen <- tox_get_savedata_size tox
     allocaArray (fromIntegral savedataLen) $ \savedataPtr -> do
@@ -236,20 +229,6 @@ toxGetSavedata tox = do
 --------------------------------------------------------------------------------
 
 
-data ErrBootstrap
-    = ErrBootstrapNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrBootstrapBadHost
-      -- The address could not be resolved to an IP address, or the IP address
-      -- passed was invalid.
-
-    | ErrBootstrapBadPort
-      -- The port passed was invalid. The valid port range is (1, 65535).
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Sends a "get nodes" request to the given bootstrap node with IP, port, and
 -- public key to setup connections.
 --
@@ -262,8 +241,7 @@ data ErrBootstrap
 -- @param public_key The long term public key of the bootstrap node
 --   ('tox_public_key_size' bytes).
 -- @return true on success.
-foreign import ccall tox_bootstrap :: Tox -> CString -> Word16 -> CString -> CErr ErrBootstrap -> IO ()
-toxBootstrap :: Tox -> String -> Word16 -> BS.ByteString -> IO (Either ErrBootstrap ())
+toxBootstrap :: ToxPtr -> String -> Word16 -> BS.ByteString -> IO (Either ErrBootstrap Bool)
 toxBootstrap tox address port pubKey =
     withCString address $ \address' ->
         BS.useAsCString pubKey $ \pubKey' ->
@@ -281,8 +259,7 @@ toxBootstrap tox address port pubKey =
 -- @param public_key The long term public key of the TCP relay
 --   ('tox_public_key_size' bytes).
 -- @return true on success.
-foreign import ccall tox_add_tcp_relay :: Tox -> CString -> Word16 -> CString -> CErr ErrBootstrap -> IO ()
-toxAddTcpRelay :: Tox -> String -> Word16 -> BS.ByteString -> IO (Either ErrBootstrap ())
+toxAddTcpRelay :: ToxPtr -> String -> Word16 -> BS.ByteString -> IO (Either ErrBootstrap Bool)
 toxAddTcpRelay tox address port pubKey =
     withCString address $ \address' ->
         BS.useAsCString pubKey $ \pubKey' ->
@@ -302,14 +279,14 @@ data ErrEventsIterate
       -- Failed to encode or decode events in msgpack.
     deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
-foreign import ccall tox_events_init :: Tox -> IO ()
-foreign import ccall tox_events_iterate :: Tox -> Bool -> CErr ErrEventsIterate -> IO ToxEvents
+foreign  import ccall tox_events_init :: ToxPtr -> IO ()
+foreign  import ccall tox_events_iterate :: ToxPtr -> Bool -> CErr ErrEventsIterate -> IO ToxEvents
 
-foreign import ccall tox_events_bytes_size :: ToxEvents -> IO Word32
-foreign import ccall tox_events_get_bytes :: ToxEvents -> CString -> IO ()
+foreign  import ccall tox_events_bytes_size :: ToxEvents -> IO Word32
+foreign  import ccall tox_events_get_bytes :: ToxEvents -> CString -> IO ()
 
-foreign import ccall tox_events_load :: CString -> Word32 -> IO ToxEvents
-foreign import ccall tox_events_free :: ToxEvents -> IO ()
+foreign  import ccall tox_events_load :: CString -> Word32 -> IO ToxEvents
+foreign  import ccall tox_events_free :: ToxEvents -> IO ()
 
 toxEventsToPtr :: [Event] -> IO ToxEvents
 toxEventsToPtr events =
@@ -330,7 +307,7 @@ toxEventsFromPtr evPtr = do
             return $ Left $ show err
         Right ok -> return $ Right ok
 
-toxEventsIterate :: Tox -> IO (Either String [Event])
+toxEventsIterate :: ToxPtr -> IO (Either String [Event])
 toxEventsIterate tox =
     callErrFun (tox_events_iterate tox True) >>= \case
         Left err    -> return $ Left $ show err
@@ -339,8 +316,7 @@ toxEventsIterate tox =
 
 -- | Return the time in milliseconds before tox_iterate() should be called again
 -- for optimal performance.
-foreign import ccall tox_iteration_interval :: Tox -> IO Word32
-toxIterationInterval :: Tox -> IO Word32
+toxIterationInterval :: ToxPtr -> IO Word32
 toxIterationInterval = tox_iteration_interval
 
 --------------------------------------------------------------------------------
@@ -357,9 +333,7 @@ toxIterationInterval = tox_iteration_interval
 -- @param address A memory region of at least 'tox_address_size' bytes. If this
 --   parameter is 'nullPtr', this function has no effect.
 -- @see 'tox_address_size' for the address format.
-foreign import ccall tox_self_get_address :: Tox -> CString -> IO ()
-
-toxSelfGetAddress :: Tox -> IO BS.ByteString
+toxSelfGetAddress :: ToxPtr -> IO BS.ByteString
 toxSelfGetAddress tox =
     let addrLen = fromIntegral tox_address_size in
     allocaArray addrLen $ \addrPtr -> do
@@ -369,18 +343,18 @@ toxSelfGetAddress tox =
 -- | Set the 4-byte nospam part of the address.
 --
 -- @param nospam Any 32 bit unsigned integer.
-foreign import ccall "tox_self_set_nospam" toxSelfSetNospam :: Tox -> Word32 -> IO ()
+toxSelfSetNospam :: ToxPtr -> Word32 -> IO ()
+toxSelfSetNospam = tox_self_set_nospam
 
 -- | Get the 4-byte nospam part of the address.
-foreign import ccall "tox_self_get_nospam" toxSelfGetNospam :: Tox -> IO Word32
+toxSelfGetNospam :: ToxPtr -> IO Word32
+toxSelfGetNospam = tox_self_get_nospam
 
 -- | Copy the Tox Public Key (long term) from the Tox object.
 --
 -- @param public_key A memory region of at least 'tox_public_key_size' bytes. If
 --   this parameter is 'nullPtr', this function has no effect.
-foreign import ccall tox_self_get_public_key :: Tox -> CString -> IO ()
-
-toxSelfGetPublicKey :: Tox -> IO BS.ByteString
+toxSelfGetPublicKey :: ToxPtr -> IO BS.ByteString
 toxSelfGetPublicKey tox =
     let pkLen = fromIntegral tox_public_key_size in
     allocaArray pkLen $ \pkPtr -> do
@@ -391,9 +365,7 @@ toxSelfGetPublicKey tox =
 --
 -- @param secret_key A memory region of at least 'tox_secret_key_size' bytes. If
 --   this parameter is 'nullPtr', this function has no effect.
-foreign import ccall tox_self_get_secret_key :: Tox -> CString -> IO ()
-
-toxSelfGetSecretKey :: Tox -> IO BS.ByteString
+toxSelfGetSecretKey :: ToxPtr -> IO BS.ByteString
 toxSelfGetSecretKey tox =
     let skLen = fromIntegral tox_secret_key_size in
     allocaArray skLen $ \skPtr -> do
@@ -408,18 +380,6 @@ toxSelfGetSecretKey tox =
 --------------------------------------------------------------------------------
 
 
--- | Common error codes for all functions that set a piece of user-visible
--- client information.
-data ErrSetInfo
-    = ErrSetInfoNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrSetInfoTooLong
-      -- Information length exceeded maximum permissible size.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Set the nickname for the Tox client.
 --
 -- Nickname length cannot exceed 'tox_max_name_length'. If length is 0, the name
@@ -430,20 +390,10 @@ data ErrSetInfo
 -- @param length The size of the name byte array.
 --
 -- @return true on success.
-foreign import ccall tox_self_set_name :: Tox -> CString -> CSize -> CErr ErrSetInfo -> IO ()
-toxSelfSetName :: Tox -> BS.ByteString -> IO (Either ErrSetInfo ())
+toxSelfSetName :: ToxPtr -> BS.ByteString -> IO (Either ErrSetInfo Bool)
 toxSelfSetName tox name =
     BS.useAsCStringLen name $ \(nameStr, nameLen) ->
         callErrFun $ tox_self_set_name tox nameStr (fromIntegral nameLen)
-
-
--- | Return the length of the current nickname as passed to tox_self_set_name.
---
--- If no nickname was set before calling this function, the name is empty,
--- and this function returns 0.
---
--- @see threading for concurrency implications.
-foreign import ccall tox_self_get_name_size :: Tox -> IO CSize
 
 -- | Write the nickname set by tox_self_set_name to a byte array.
 --
@@ -455,9 +405,7 @@ foreign import ccall tox_self_get_name_size :: Tox -> IO CSize
 --
 -- @param name A valid memory location large enough to hold the nickname.
 --   If this parameter is NULL, the function has no effect.
-foreign import ccall tox_self_get_name :: Tox -> CString -> IO ()
-
-toxSelfGetName :: Tox -> IO BS.ByteString
+toxSelfGetName :: ToxPtr -> IO BS.ByteString
 toxSelfGetName tox = do
     nameLen <- tox_self_get_name_size tox
     allocaArray (fromIntegral nameLen) $ \namePtr -> do
@@ -470,20 +418,10 @@ toxSelfGetName tox = do
 -- Status message length cannot exceed 'tox_max_status_message_length'. If
 -- length is 0, the status parameter is ignored (it can be 'nullPtr'), and the
 -- user status is set back to empty.
-foreign import ccall tox_self_set_status_message :: Tox -> CString -> CSize -> CErr ErrSetInfo -> IO ()
-toxSelfSetStatusMessage :: Tox -> BS.ByteString -> IO (Either ErrSetInfo ())
+toxSelfSetStatusMessage :: ToxPtr -> BS.ByteString -> IO (Either ErrSetInfo Bool)
 toxSelfSetStatusMessage tox statusMsg =
     BS.useAsCStringLen statusMsg $ \(statusMsgStr, statusMsgLen) ->
         callErrFun $ tox_self_set_status_message tox statusMsgStr (fromIntegral statusMsgLen)
-
-
--- | Return the length of the current status message as passed to tox_self_set_status_message.
---
--- If no status message was set before calling this function, the status
--- is empty, and this function returns 0.
---
--- @see threading for concurrency implications.
-foreign import ccall tox_self_get_status_message_size :: Tox -> IO CSize
 
 
 -- | Write the status message set by tox_self_set_status_message to a byte array.
@@ -496,9 +434,7 @@ foreign import ccall tox_self_get_status_message_size :: Tox -> IO CSize
 --
 -- @param status_message A valid memory location large enough to hold the
 --   status message. If this parameter is NULL, the function has no effect.
-foreign import ccall tox_self_get_status_message :: Tox -> CString -> IO ()
-
-toxSelfGetStatusMessage :: Tox -> IO BS.ByteString
+toxSelfGetStatusMessage :: ToxPtr -> IO BS.ByteString
 toxSelfGetStatusMessage tox = do
     statusMessageLen <- tox_self_get_status_message_size tox
     allocaArray (fromIntegral statusMessageLen) $ \statusMessagePtr -> do
@@ -509,8 +445,7 @@ toxSelfGetStatusMessage tox = do
 -- | Set the client's user status.
 --
 -- @param user_status One of the user statuses listed in the enumeration above.
-foreign import ccall tox_self_set_status :: Tox -> CEnum UserStatus -> IO ()
-toxSelfSetStatus :: Tox -> UserStatus -> IO ()
+toxSelfSetStatus :: ToxPtr -> UserStatus -> IO ()
 toxSelfSetStatus tox userStatus =
     tox_self_set_status tox $ toCEnum userStatus
 
@@ -520,37 +455,6 @@ toxSelfSetStatus tox userStatus =
 -- :: Friend list management
 --
 --------------------------------------------------------------------------------
-
-
-data ErrFriendAdd
-    = ErrFriendAddNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrFriendAddTooLong
-      -- The length of the friend request message exceeded
-      -- 'tox_max_friend_request_length'.
-
-    | ErrFriendAddNoMessage
-      -- The friend request message was empty. This, and the TooLong code will
-      -- never be returned from tox_friend_add_norequest.
-
-    | ErrFriendAddOwnKey
-      -- The friend address belongs to the sending client.
-
-    | ErrFriendAddAlreadySent
-      -- A friend request has already been sent, or the address belongs to a
-      -- friend that is already on the friend list.
-
-    | ErrFriendAddBadChecksum
-      -- The friend address checksum failed.
-
-    | ErrFriendAddSetNewNospam
-      -- The friend was already there, but the nospam value was different.
-
-    | ErrFriendAddMalloc
-      -- A memory allocation failed when trying to increase the friend list size.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Add a friend to the friend list and send a friend request.
@@ -574,8 +478,7 @@ data ErrFriendAdd
 -- @param length The length of the data byte array.
 --
 -- @return the friend number on success, UINT32_MAX on failure.
-foreign import ccall tox_friend_add :: Tox -> CString -> CString -> CSize -> CErr ErrFriendAdd -> IO Word32
-toxFriendAdd :: Tox -> BS.ByteString -> BS.ByteString -> IO (Either ErrFriendAdd Word32)
+toxFriendAdd :: ToxPtr -> BS.ByteString -> BS.ByteString -> IO (Either ErrFriendAdd Word32)
 toxFriendAdd tox address message =
     BS.useAsCStringLen message $ \(msgStr, msgLen) ->
         BS.useAsCString address $ \addr' ->
@@ -597,18 +500,10 @@ toxFriendAdd tox address message =
 --
 -- @return the friend number on success, UINT32_MAX on failure.
 -- @see tox_friend_add for a more detailed description of friend numbers.
-foreign import ccall tox_friend_add_norequest :: Tox -> CString -> CErr ErrFriendAdd -> IO Word32
-toxFriendAddNorequest :: Tox -> BS.ByteString -> IO (Either ErrFriendAdd Word32)
+toxFriendAddNorequest :: ToxPtr -> BS.ByteString -> IO (Either ErrFriendAdd Word32)
 toxFriendAddNorequest tox address =
     BS.useAsCString address $ \addr' ->
         callErrFun $ tox_friend_add_norequest tox addr'
-
-
-data ErrFriendDelete
-    = ErrFriendDeleteFriendNotFound
-      -- There was no friend with the given friend number. No friends were
-      -- deleted.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Remove a friend from the friend list.
@@ -620,9 +515,7 @@ data ErrFriendDelete
 -- @param friend_number Friend number for the friend to be deleted.
 --
 -- @return true on success.
-foreign import ccall tox_friend_delete :: Tox -> Word32 -> CErr ErrFriendDelete -> IO ()
-
-toxFriendDelete :: Tox -> Word32 -> IO (Either ErrFriendDelete ())
+toxFriendDelete :: ToxPtr -> Word32 -> IO (Either ErrFriendDelete Bool)
 toxFriendDelete tox fn = callErrFun $ tox_friend_delete tox fn
 
 
@@ -633,35 +526,19 @@ toxFriendDelete tox fn = callErrFun $ tox_friend_delete tox fn
 --------------------------------------------------------------------------------
 
 
-data ErrFriendByPublicKey
-    = ErrFriendByPublicKeyNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrFriendByPublicKeyNotFound
-      -- No friend with the given Public Key exists on the friend list.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Return the friend number associated with that Public Key.
 --
 -- @return the friend number on success, UINT32_MAX on failure.
 -- @param public_key A byte array containing the Public Key.
-foreign import ccall tox_friend_by_public_key :: Tox -> CString -> CErr ErrFriendByPublicKey -> IO Word32
-toxFriendByPublicKey :: Tox -> BS.ByteString -> IO (Either ErrFriendByPublicKey Word32)
+toxFriendByPublicKey :: ToxPtr -> BS.ByteString -> IO (Either ErrFriendByPublicKey Word32)
 toxFriendByPublicKey tox address =
     BS.useAsCString address $ \addr' ->
         callErrFun $ tox_friend_by_public_key tox addr'
 
 -- | Checks if a friend with the given friend number exists and returns true if
 -- it does.
-foreign import ccall "tox_friend_exists" toxFriendExists :: Tox -> Word32 -> IO Bool
-
--- | Return the number of friends on the friend list.
---
--- This function can be used to determine how much memory to allocate for
--- tox_self_get_friend_list.
-foreign import ccall tox_self_get_friend_list_size :: Tox -> IO CSize
+toxFriendExists :: ToxPtr -> Word32 -> IO Bool
+toxFriendExists = tox_friend_exists
 
 -- | Copy a list of valid friend numbers into an array.
 --
@@ -670,19 +547,12 @@ foreign import ccall tox_self_get_friend_list_size :: Tox -> IO CSize
 --
 -- @param list A memory region with enough space to hold the friend list. If
 --   this parameter is 'nullPtr', this function has no effect.
-foreign import ccall tox_self_get_friend_list :: Tox -> Ptr Word32 -> IO ()
-
-toxSelfGetFriendList :: Tox -> IO [Word32]
+toxSelfGetFriendList :: ToxPtr -> IO [Word32]
 toxSelfGetFriendList tox = do
     friendListSize <- tox_self_get_friend_list_size tox
     allocaArray (fromIntegral friendListSize) $ \friendListPtr -> do
         tox_self_get_friend_list tox friendListPtr
         peekArray (fromIntegral friendListSize) friendListPtr
-
-data ErrFriendGetPublicKey
-    = ErrFriendGetPublicKeyFriendNotFound
-      -- No friend with the given number exists on the friend list.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Copies the Public Key associated with a given friend number to a byte
@@ -693,8 +563,7 @@ data ErrFriendGetPublicKey
 --   this parameter is 'nullPtr', this function has no effect.
 --
 -- @return true on success.
-foreign import ccall tox_friend_get_public_key :: Tox -> Word32 -> CString -> CErr ErrFriendGetPublicKey -> IO Bool
-toxFriendGetPublicKey :: Tox -> Word32 -> IO (Either ErrFriendGetPublicKey BS.ByteString)
+toxFriendGetPublicKey :: ToxPtr -> Word32 -> IO (Either ErrFriendGetPublicKey BS.ByteString)
 toxFriendGetPublicKey tox fn =
     let pkLen = fromIntegral tox_public_key_size in
     allocaArray pkLen $ \pkPtr -> do
@@ -704,18 +573,11 @@ toxFriendGetPublicKey tox fn =
             Right _  -> Right <$> BS.packCStringLen (pkPtr, pkLen)
 
 
-data ErrFriendGetLastOnline
-    = ErrFriendGetLastOnlineFriendNotFound
-      -- No friend with the given number exists on the friend list.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Return a unix-time timestamp of the last time the friend associated with a given
 -- friend number was seen online. This function will return UINT64_MAX on error.
 --
 -- @param friend_number The friend number you want to query.
-foreign import ccall tox_friend_get_last_online :: Tox -> Word32 -> CErr ErrFriendGetLastOnline -> IO Word64
-toxFriendGetLastOnline :: Tox -> Word32 -> IO (Either ErrFriendGetLastOnline EpochTime)
+toxFriendGetLastOnline :: ToxPtr -> Word32 -> IO (Either ErrFriendGetLastOnline EpochTime)
 toxFriendGetLastOnline tox fn =
     callErrFun (tox_friend_get_last_online tox fn >=> (return . CTime . fromIntegral))
 
@@ -726,25 +588,6 @@ toxFriendGetLastOnline tox fn =
 --
 --------------------------------------------------------------------------------
 
-
--- | Common error codes for friend state query functions.
-data ErrFriendQuery
-    = ErrFriendQueryNull
-      -- The pointer parameter for storing the query result (name, message) was
-      -- NULL. Unlike the `_self_` variants of these functions, which have no effect
-      -- when a parameter is NULL, these functions return an error in that case.
-
-    | ErrFriendQueryFriendNotFound
-      -- The friend_number did not designate a valid friend.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
--- | Return the length of the friend's name. If the friend number is invalid, the
--- return value is unspecified.
---
--- The return value is equal to the `length` argument received by the last
--- `friend_name` callback.
-foreign import ccall tox_friend_get_name_size :: Tox -> Word32 -> CErr ErrFriendQuery -> IO CSize
 
 -- | Write the name of the friend designated by the given friend number to a byte
 -- array.
@@ -758,9 +601,7 @@ foreign import ccall tox_friend_get_name_size :: Tox -> Word32 -> CErr ErrFriend
 -- @param name A valid memory region large enough to store the friend's name.
 --
 -- @return true on success.
-foreign import ccall tox_friend_get_name :: Tox -> Word32 -> CString -> CErr ErrFriendQuery -> IO Bool
-
-toxFriendGetName :: Tox -> Word32 -> IO (Either ErrFriendQuery BS.ByteString)
+toxFriendGetName :: ToxPtr -> Word32 -> IO (Either ErrFriendQuery BS.ByteString)
 toxFriendGetName tox fn = do
     nameLenRes <- callErrFun $ tox_friend_get_name_size tox fn
     case nameLenRes of
@@ -772,10 +613,6 @@ toxFriendGetName tox fn = do
                 Right _ -> Right <$> BS.packCStringLen (namePtr, fromIntegral nameLen)
 
 
--- | Return the length of the friend's status message. If the friend number is
--- invalid, the return value is SIZE_MAX.
-foreign import ccall tox_friend_get_status_message_size :: Tox -> Word32 -> CErr ErrFriendQuery -> IO CSize
-
 -- | Write the status message of the friend designated by the given friend number to a byte
 -- array.
 --
@@ -786,9 +623,7 @@ foreign import ccall tox_friend_get_status_message_size :: Tox -> Word32 -> CErr
 -- `friend_status_message` callback.
 --
 -- @param status_message A valid memory region large enough to store the friend's status message.
-foreign import ccall tox_friend_get_status_message :: Tox -> Word32 -> CString -> CErr ErrFriendQuery -> IO Bool
-
-toxFriendGetStatusMessage :: Tox -> Word32 -> IO (Either ErrFriendQuery BS.ByteString)
+toxFriendGetStatusMessage :: ToxPtr -> Word32 -> IO (Either ErrFriendQuery BS.ByteString)
 toxFriendGetStatusMessage tox fn = do
     statusMessageLenRes <- callErrFun $ tox_friend_get_status_message_size tox fn
     case statusMessageLenRes of
@@ -810,8 +645,7 @@ toxFriendGetStatusMessage tox fn = do
 --
 -- @return the friend's connection status as it was received through the
 --   `friend_connection_status` event.
-foreign import ccall tox_friend_get_connection_status :: Tox -> Word32 -> CErr ErrFriendQuery -> IO (CEnum Connection)
-toxFriendGetConnectionStatus :: Tox -> Word32 -> IO (Either ErrFriendQuery Connection)
+toxFriendGetConnectionStatus :: ToxPtr -> Word32 -> IO (Either ErrFriendQuery Connection)
 toxFriendGetConnectionStatus tox fn =
     callErrFun (tox_friend_get_connection_status tox fn >=> return . fromCEnum)
 
@@ -823,8 +657,7 @@ toxFriendGetConnectionStatus tox fn =
 -- @return true if the friend is typing.
 -- @return false if the friend is not typing, or the friend number was
 --   invalid. Inspect the error code to determine which case it is.
-foreign import ccall tox_friend_get_typing :: Tox -> Word32 -> CErr ErrFriendQuery -> IO Bool
-toxFriendGetTyping :: Tox -> Word32 -> IO (Either ErrFriendQuery Bool)
+toxFriendGetTyping :: ToxPtr -> Word32 -> IO (Either ErrFriendQuery Bool)
 toxFriendGetTyping tox fn = callErrFun $ tox_friend_get_typing tox fn
 
 
@@ -835,12 +668,6 @@ toxFriendGetTyping tox fn = callErrFun $ tox_friend_get_typing tox fn
 --------------------------------------------------------------------------------
 
 
-data ErrSetTyping
-    = ErrSetTypingFriendNotFound
-      -- The friend number did not designate a valid friend.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Set the client's typing status for a friend.
 --
 -- The client is responsible for turning it on or off.
@@ -849,31 +676,8 @@ data ErrSetTyping
 -- @param typing The typing status. True means the client is typing.
 --
 -- @return true on success.
-foreign import ccall tox_self_set_typing :: Tox -> Word32 -> Bool -> CErr ErrSetTyping -> IO Bool
-toxSelfSetTyping :: Tox -> Word32 -> Bool -> IO (Either ErrSetTyping Bool)
+toxSelfSetTyping :: ToxPtr -> Word32 -> Bool -> IO (Either ErrSetTyping Bool)
 toxSelfSetTyping tox fn typing = callErrFun $ tox_self_set_typing tox fn typing
-
-
-data ErrFriendSendMessage
-    = ErrFriendSendMessageNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrFriendSendMessageFriendNotFound
-      -- The friend number did not designate a valid friend.
-
-    | ErrFriendSendMessageFriendNotConnected
-      -- This client is currently not connected to the friend.
-
-    | ErrFriendSendMessageSendq
-      -- An allocation error occurred while increasing the send queue size.
-
-    | ErrFriendSendMessageTooLong
-      -- Message length exceeded 'tox_max_message_length'.
-
-    | ErrFriendSendMessageEmpty
-      -- Attempted to send a zero-length message.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Send a text chat message to an online friend.
@@ -898,8 +702,7 @@ data ErrFriendSendMessage
 -- @param message A non-'nullPtr' pointer to the first element of a byte array
 --   containing the message text.
 -- @param length Length of the message to be sent.
-foreign import ccall tox_friend_send_message :: Tox -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrFriendSendMessage -> IO Word32
-toxFriendSendMessage :: Tox -> Word32 -> MessageType -> BS.ByteString -> IO (Either ErrFriendSendMessage Word32)
+toxFriendSendMessage :: ToxPtr -> Word32 -> MessageType -> BS.ByteString -> IO (Either ErrFriendSendMessage Word32)
 toxFriendSendMessage tox fn messageType message =
     BS.useAsCStringLen message $ \(msgStr, msgLen) ->
         callErrFun $ tox_friend_send_message tox fn (toCEnum messageType) msgStr (fromIntegral msgLen)
@@ -929,8 +732,6 @@ toxFriendSendMessage tox fn messageType message =
 -- @param length Size of the data array or 0.
 --
 -- @return true if hash was not 'nullPtr'.
-foreign import ccall tox_hash :: CString -> CString -> CSize -> IO Bool
-
 toxHash :: BS.ByteString -> IO BS.ByteString
 toxHash d =
     let hashLen = fromIntegral tox_hash_length in
@@ -938,58 +739,6 @@ toxHash d =
         BS.useAsCStringLen d $ \(dataPtr, dataLen) -> do
             _ <- tox_hash hashPtr dataPtr (fromIntegral dataLen)
             BS.packCStringLen (dataPtr, fromIntegral dataLen)
-
-
-data FileKind
-  = FileKindData
-    -- Arbitrary file data. Clients can choose to handle it based on the file
-    -- name or magic or any other way they choose.
-
-  | FileKindAvatar
-    -- Avatar file_id. This consists of tox_hash(image).  Avatar data. This
-    -- consists of the image data.
-    --
-    -- Avatars can be sent at any time the client wishes. Generally, a client
-    -- will send the avatar to a friend when that friend comes online, and to
-    -- all friends when the avatar changed. A client can save some traffic by
-    -- remembering which friend received the updated avatar already and only
-    -- send it if the friend has an out of date avatar.
-    --
-    -- Clients who receive avatar send requests can reject it (by sending
-    -- FileControlCancel before any other controls), or accept it (by sending
-    -- FileControlResume). The file_id of length 'tox_hash_length' bytes (same
-    -- length as 'tox_file_id_length') will contain the hash. A client can
-    -- compare this hash with a saved hash and send FileControlCancel to
-    -- terminate the avatar transfer if it matches.
-    --
-    -- When file_size is set to 0 in the transfer request it means that the
-    -- client has no avatar.
-  deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
-data ErrFileControl
-    = ErrFileControlFriendNotFound
-      -- The friend_number passed did not designate a valid friend.
-
-    | ErrFileControlFriendNotConnected
-      -- This client is currently not connected to the friend.
-
-    | ErrFileControlNotFound
-      -- No file transfer with the given file number was found for the given friend.
-
-    | ErrFileControlNotPaused
-      -- A Resume control was sent, but the file transfer is running normally.
-
-    | ErrFileControlDenied
-      -- A Resume control was sent, but the file transfer was paused by the other
-      -- party. Only the party that paused the transfer can resume it.
-
-    | ErrFileControlAlreadyPaused
-      -- A Pause control was sent, but the file transfer was already paused.
-
-    | ErrFileControlSendq
-      -- Packet queue is full.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Sends a file control command to a friend for a given file transfer.
@@ -1000,30 +749,8 @@ data ErrFileControl
 -- @param control The control command to send.
 --
 -- @return true on success.
-foreign import ccall tox_file_control :: Tox -> Word32 -> Word32 -> CEnum FileControl -> CErr ErrFileControl -> IO Bool
-toxFileControl :: Tox -> Word32 -> Word32 -> FileControl -> IO (Either ErrFileControl Bool)
+toxFileControl :: ToxPtr -> Word32 -> Word32 -> FileControl -> IO (Either ErrFileControl Bool)
 toxFileControl tox fn fileNum control = callErrFun $ tox_file_control tox fn fileNum (toCEnum control)
-
-
-data ErrFileSeek
-    = ErrFileSeekFriendNotFound
-      -- The friend_number passed did not designate a valid friend.
-
-    | ErrFileSeekFriendNotConnected
-      -- This client is currently not connected to the friend.
-
-    | ErrFileSeekNotFound
-      -- No file transfer with the given file number was found for the given friend.
-
-    | ErrFileSeekDenied
-      -- File was not in a state where it could be seeked.
-
-    | ErrFileSeekInvalidPosition
-      -- Seek position was invalid
-
-    | ErrFileSeekSendq
-      -- Packet queue is full.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Sends a file seek control command to a friend for a given file transfer.
@@ -1035,22 +762,8 @@ data ErrFileSeek
 --   received from.
 -- @param file_number The friend-specific identifier for the file transfer.
 -- @param position The position that the file should be seeked to.
-foreign import ccall tox_file_seek :: Tox -> Word32 -> Word32 -> Word64 -> CErr ErrFileSeek -> IO Bool
-toxFileSeek :: Tox -> Word32 -> Word32 -> Word64 -> IO (Either ErrFileSeek Bool)
+toxFileSeek :: ToxPtr -> Word32 -> Word32 -> Word64 -> IO (Either ErrFileSeek Bool)
 toxFileSeek tox fn fileNum pos = callErrFun $ tox_file_seek tox fn fileNum pos
-
-
-data ErrFileGet
-    = ErrFileGetNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrFileGetFriendNotFound
-      -- The friend_number passed did not designate a valid friend.
-
-    | ErrFileGetNotFound
-      -- No file transfer with the given file number was found for the given friend.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Copy the file id associated to the file transfer to a byte array.
@@ -1062,8 +775,7 @@ data ErrFileGet
 --   this parameter is 'nullPtr', this function has no effect.
 --
 -- @return true on success.
-foreign import ccall tox_file_get_file_id :: Tox -> Word32 -> Word32 -> CString -> CErr ErrFileGet -> IO Bool
-toxFileGetFileId :: Tox -> Word32 -> Word32 -> IO (Either ErrFileGet BS.ByteString)
+toxFileGetFileId :: ToxPtr -> Word32 -> Word32 -> IO (Either ErrFileGet BS.ByteString)
 toxFileGetFileId tox fn fileNum =
     let fileIdLen = fromIntegral tox_file_id_length in
     allocaArray fileIdLen $ \fileIdPtr -> do
@@ -1078,26 +790,6 @@ toxFileGetFileId tox fn fileNum =
 -- :: File transmission: sending
 --
 --------------------------------------------------------------------------------
-
-
-data ErrFileSend
-    = ErrFileSendNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrFileSendFriendNotFound
-      -- The friend_number passed did not designate a valid friend.
-
-    | ErrFileSendFriendNotConnected
-      -- This client is currently not connected to the friend.
-
-    | ErrFileSendNameTooLong
-      -- Filename length exceeded 'tox_max_filename_length' bytes.
-
-    | ErrFileSendTooMany
-      -- Too many ongoing transfers. The maximum number of concurrent file transfers
-      -- is 256 per friend per direction (sending and receiving).
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Send a file transmission request.
@@ -1158,43 +850,10 @@ data ErrFileSend
 --   number is per friend. File numbers are reused after a transfer terminates.
 --   On failure, this function returns UINT32_MAX. Any pattern in file numbers
 --   should not be relied on.
-foreign import ccall tox_file_send :: Tox -> Word32 -> CEnum FileKind -> Word64 -> CString -> CString -> CSize -> CErr ErrFileSend -> IO Word32
-toxFileSend :: Tox -> Word32 -> FileKind -> Word64 -> BS.ByteString -> IO (Either ErrFileSend Word32)
+toxFileSend :: ToxPtr -> Word32 -> FileKind -> Word64 -> BS.ByteString -> IO (Either ErrFileSend Word32)
 toxFileSend tox fn fileKind fileSize fileName =
     BS.useAsCStringLen fileName $ \(fileNamePtr, fileNameLen) ->
-        callErrFun $ tox_file_send tox fn (toCEnum fileKind) fileSize nullPtr fileNamePtr (fromIntegral fileNameLen)
-
-
-data ErrFileSendChunk
-    = ErrFileSendChunkNull
-      -- The length parameter was non-zero, but data was 'nullPtr'.
-
-    | ErrFileSendChunkFriendNotFound
-      -- The friend_number passed did not designate a valid friend.
-
-    | ErrFileSendChunkFriendNotConnected
-      -- This client is currently not connected to the friend.
-
-    | ErrFileSendChunkNotFound
-      -- No file transfer with the given file number was found for the given friend.
-
-    | ErrFileSendChunkNotTransferring
-      -- File transfer was found but isn't in a transferring state: (paused, done,
-      -- broken, etc...) (happens only when not called from the request chunk
-      -- callback).
-
-    | ErrFileSendChunkInvalidLength
-      -- Attempted to send more or less data than requested. The requested data
-      -- size is adjusted according to maximum transmission unit and the expected
-      -- end of the file. Trying to send less or more than requested will return
-      -- this error.
-
-    | ErrFileSendChunkSendq
-      -- Packet queue is full.
-
-    | ErrFileSendChunkWrongPosition
-      -- Position parameter was wrong.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
+        callErrFun $ tox_file_send tox fn (fromIntegral $ fromEnum fileKind) fileSize nullPtr fileNamePtr (fromIntegral fileNameLen)
 
 
 -- | Send a chunk of file data to a friend.
@@ -1212,8 +871,7 @@ data ErrFileSendChunk
 -- @param file_number The file transfer identifier returned by tox_file_send.
 -- @param position The file or stream position from which to continue reading.
 -- @return true on success.
-foreign import ccall tox_file_send_chunk :: Tox -> Word32 -> Word32 -> Word64 -> CString -> CSize -> CErr ErrFileSendChunk -> IO Bool
-toxFileSendChunk :: Tox -> Word32 -> Word32 -> Word64 -> BS.ByteString -> IO (Either ErrFileSendChunk Bool)
+toxFileSendChunk :: ToxPtr -> Word32 -> Word32 -> Word64 -> BS.ByteString -> IO (Either ErrFileSendChunk Bool)
 toxFileSendChunk tox fn fileNum pos d =
     BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
         callErrFun $ tox_file_send_chunk tox fn fileNum pos dataPtr (fromIntegral dataLen)
@@ -1226,26 +884,13 @@ toxFileSendChunk tox fn fileNum pos d =
 --------------------------------------------------------------------------------
 
 
-data ErrConferenceNew
-    = ErrConferenceNewInit
-      -- The conference instance failed to initialize.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Creates a new conference.
 --
 -- This function creates a new text conference.
 --
 -- @return conference number on success, or UINT32_MAX on failure.
-foreign import ccall tox_conference_new :: Tox -> CErr ErrConferenceNew -> IO Word32
-toxConferenceNew :: Tox -> IO (Either ErrConferenceNew Word32)
+toxConferenceNew :: ToxPtr -> IO (Either ErrConferenceNew Word32)
 toxConferenceNew tox = callErrFun $ tox_conference_new tox
-
-
-data ErrConferenceDelete
-    = ErrConferenceDeleteConferenceNotFound
-      -- The conference number passed did not designate a valid conference.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | This function deletes a conference.
@@ -1253,42 +898,20 @@ data ErrConferenceDelete
 -- @param conference_number The conference number of the conference to be deleted.
 --
 -- @return true on success.
-foreign import ccall tox_conference_delete :: Tox -> Word32 -> CErr ErrConferenceDelete -> IO Bool
-toxConferenceDelete :: Tox -> Word32 -> IO (Either ErrConferenceDelete Bool)
+toxConferenceDelete :: ToxPtr -> Word32 -> IO (Either ErrConferenceDelete Bool)
 toxConferenceDelete tox gn = callErrFun $ tox_conference_delete tox gn
 
 
--- | Error codes for peer info queries.
-data ErrConferencePeerQuery
-    = ErrConferencePeerQueryConferenceNotFound
-      -- The conference number passed did not designate a valid conference.
-
-    | ErrConferencePeerQueryPeerNotFound
-      -- The peer number passed did not designate a valid peer.
-
-    | ErrConferencePeerQueryNoConnection
-      -- The client is not connected to the conference.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
-
 -- | Return the number of peers in the conference. Return value is unspecified on failure.
-foreign import ccall tox_conference_peer_count :: Tox -> Word32 -> CErr ErrConferencePeerQuery -> IO Word32
-toxConferencePeerCount :: Tox -> Word32 -> IO (Either ErrConferencePeerQuery Word32)
+toxConferencePeerCount :: ToxPtr -> Word32 -> IO (Either ErrConferencePeerQuery Word32)
 toxConferencePeerCount tox gn = callErrFun $ tox_conference_peer_count tox gn
-
-
--- | Return the length of the peer's name. Return value is unspecified on failure.
-foreign import ccall tox_conference_peer_get_name_size :: Tox -> Word32 -> Word32 -> CErr ErrConferencePeerQuery -> IO CSize
 
 
 -- | Copy the name of peer_number who is in conference_number to name.
 -- name must be at least TOX_MAX_NAME_LENGTH long.
 --
 -- @return true on success.
-foreign import ccall tox_conference_peer_get_name :: Tox -> Word32 -> Word32 -> CString -> CErr ErrConferencePeerQuery -> IO Bool
-
-toxConferencePeerGetName :: Tox -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
+toxConferencePeerGetName :: ToxPtr -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
 toxConferencePeerGetName tox gn pn = do
     nameLenRes <- callErrFun $ tox_conference_peer_get_name_size tox gn pn
     case nameLenRes of
@@ -1304,8 +927,7 @@ toxConferencePeerGetName tox gn pn = do
 -- public_key must be TOX_PUBLIC_KEY_SIZE long.
 --
 -- @return true on success.
-foreign import ccall tox_conference_peer_get_public_key :: Tox -> Word32 -> Word32 -> CString -> CErr ErrConferencePeerQuery -> IO Bool
-toxConferencePeerGetPublicKey :: Tox -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
+toxConferencePeerGetPublicKey :: ToxPtr -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery BS.ByteString)
 toxConferencePeerGetPublicKey tox gn pn =
     let pkLen = fromIntegral tox_public_key_size in
     allocaArray pkLen $ \pkPtr -> do
@@ -1316,19 +938,8 @@ toxConferencePeerGetPublicKey tox gn pn =
 
 
 -- | Return true if passed peer_number corresponds to our own.
-foreign import ccall tox_conference_peer_number_is_ours :: Tox -> Word32 -> Word32 -> CErr ErrConferencePeerQuery -> IO Bool
-toxConferencePeerNumberIsOurs :: Tox -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery Bool)
+toxConferencePeerNumberIsOurs :: ToxPtr -> Word32 -> Word32 -> IO (Either ErrConferencePeerQuery Bool)
 toxConferencePeerNumberIsOurs tox gn pn = callErrFun $ tox_conference_peer_number_is_ours tox gn pn
-
-
-data ErrConferenceInvite
-    = ErrConferenceInviteConferenceNotFound
-      -- The conference number passed did not designate a valid conference.
-
-    | ErrConferenceInviteFailSend
-      -- The invite packet failed to send.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
 
 
 -- | Invites a friend to a conference.
@@ -1337,31 +948,8 @@ data ErrConferenceInvite
 -- @param conference_number The conference number of the conference we want to invite the friend to.
 --
 -- @return true on success.
-foreign import ccall tox_conference_invite :: Tox -> Word32 -> Word32 -> CErr ErrConferenceInvite -> IO Bool
-toxConferenceInvite :: Tox -> Word32 -> Word32 -> IO (Either ErrConferenceInvite Bool)
+toxConferenceInvite :: ToxPtr -> Word32 -> Word32 -> IO (Either ErrConferenceInvite Bool)
 toxConferenceInvite tox fn gn = callErrFun $ tox_conference_invite tox fn gn
-
-
-data ErrConferenceJoin
-    = ErrConferenceJoinInvalidLength
-      -- The cookie passed has an invalid length.
-
-    | ErrConferenceJoinWrongType
-      -- The conference is not the expected type. This indicates an invalid cookie.
-
-    | ErrConferenceJoinFriendNotFound
-      -- The friend number passed does not designate a valid friend.
-
-    | ErrConferenceJoinDuplicate
-      -- Client is already in this conference.
-
-    | ErrConferenceJoinInitFail
-      -- Conference instance failed to initialize.
-
-    | ErrConferenceJoinFailSend
-      -- The join packet failed to send.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
 
 
 -- | Joins a conference that the client has been invited to.
@@ -1371,27 +959,10 @@ data ErrConferenceJoin
 -- @param length The size of cookie.
 --
 -- @return conference number on success, UINT32_MAX on failure.
-foreign import ccall tox_conference_join :: Tox -> Word32 -> CString -> CSize -> CErr ErrConferenceJoin -> IO Word32
-toxConferenceJoin :: Tox -> Word32 -> BS.ByteString -> IO (Either ErrConferenceJoin Word32)
+toxConferenceJoin :: ToxPtr -> Word32 -> BS.ByteString -> IO (Either ErrConferenceJoin Word32)
 toxConferenceJoin tox fn cookie =
     BS.useAsCStringLen cookie $ \(cookiePtr, cookieLen) ->
         callErrFun $ tox_conference_join tox fn cookiePtr (fromIntegral cookieLen)
-
-
-data ErrConferenceSendMessage
-    = ErrConferenceSendMessageConferenceNotFound
-      -- The conference number passed did not designate a valid conference.
-
-    | ErrConferenceSendMessageTooLong
-      -- The message is too long.
-
-    | ErrConferenceSendMessageNoConnection
-      -- The client is not connected to the conference.
-
-    | ErrConferenceSendMessageFailSend
-      -- The message packet failed to send.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
 
 
 -- | Send a text chat message to the conference.
@@ -1410,31 +981,10 @@ data ErrConferenceSendMessage
 -- @param length Length of the message to be sent.
 --
 -- @return true on success.
-foreign import ccall tox_conference_send_message :: Tox -> Word32 -> CEnum MessageType -> CString -> CSize -> CErr ErrConferenceSendMessage -> IO Bool
-toxConferenceSendMessage :: Tox -> Word32 -> MessageType -> BS.ByteString -> IO (Either ErrConferenceSendMessage Bool)
+toxConferenceSendMessage :: ToxPtr -> Word32 -> MessageType -> BS.ByteString -> IO (Either ErrConferenceSendMessage Bool)
 toxConferenceSendMessage tox gn messageType message =
     BS.useAsCStringLen message $ \(msgPtr, msgLen) ->
         callErrFun $ tox_conference_send_message tox gn (toCEnum messageType) msgPtr (fromIntegral msgLen)
-
-
-data ErrConferenceTitle
-    = ErrConferenceTitleConferenceNotFound
-      -- The conference number passed did not designate a valid conference.
-
-    | ErrConferenceTitleInvalidLength
-      -- The title is too long or empty.
-
-    | ErrConferenceTitleFailSend
-      -- The title packet failed to send.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
-
--- | Return the length of the conference title. Return value is unspecified on failure.
---
--- The return value is equal to the `length` argument received by the last
--- `conference_title` callback.
-foreign import ccall tox_conference_get_title_size :: Tox -> Word32 -> CErr ErrConferenceTitle -> IO CSize
 
 
 -- | Write the title designated by the given conference number to a byte array.
@@ -1448,9 +998,7 @@ foreign import ccall tox_conference_get_title_size :: Tox -> Word32 -> CErr ErrC
 --   If this parameter is NULL, this function has no effect.
 --
 -- @return true on success.
-foreign import ccall tox_conference_get_title :: Tox -> Word32 -> CString -> CErr ErrConferenceTitle -> IO Bool
-
-toxConferenceGetTitle :: Tox -> Word32 -> IO (Either ErrConferenceTitle BS.ByteString)
+toxConferenceGetTitle :: ToxPtr -> Word32 -> IO (Either ErrConferenceTitle BS.ByteString)
 toxConferenceGetTitle tox gn = do
     titleLenRes <- callErrFun $ tox_conference_get_title_size tox gn
     case titleLenRes of
@@ -1466,38 +1014,22 @@ toxConferenceGetTitle tox gn = do
 -- Title length cannot be longer than TOX_MAX_NAME_LENGTH.
 --
 -- @return true on success.
-foreign import ccall tox_conference_set_title :: Tox -> Word32 -> CString -> CSize -> CErr ErrConferenceTitle -> IO Bool
-toxConferenceSetTitle :: Tox -> Word32 -> BS.ByteString -> IO (Either ErrConferenceTitle Bool)
+toxConferenceSetTitle :: ToxPtr -> Word32 -> BS.ByteString -> IO (Either ErrConferenceTitle Bool)
 toxConferenceSetTitle tox gn title =
     BS.useAsCStringLen title $ \(titlePtr, titleLen) ->
         callErrFun $ tox_conference_set_title tox gn titlePtr (fromIntegral titleLen)
 
 
--- | Return the number of conferences in the Tox instance.
--- This should be used to determine how much memory to allocate for `tox_conference_get_chatlist`.
-foreign import ccall tox_conference_get_chatlist_size :: Tox -> IO CSize
-
-
 -- | Copy a list of valid conference IDs into the array chatlist. Determine how much space
 -- to allocate for the array with the `tox_conference_get_chatlist_size` function.
-foreign import ccall tox_conference_get_chatlist :: Tox -> Ptr Word32 -> IO ()
-
-toxConferenceGetChatlist :: Tox -> IO [Word32]
+toxConferenceGetChatlist :: ToxPtr -> IO [Word32]
 toxConferenceGetChatlist tox = do
     chatListSize <- tox_conference_get_chatlist_size tox
     allocaArray (fromIntegral chatListSize) $ \chatListPtr -> do
         tox_conference_get_chatlist tox chatListPtr
         peekArray (fromIntegral chatListSize) chatListPtr
 
--- | Returns the type of conference (TOX_CONFERENCE_TYPE) that conference_number is. Return value is
--- unspecified on failure.
-data ErrConferenceGetType
-    = ErrConferenceGetTypeConferenceNotFound
-      -- The conference number passed did not designate a valid conference.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-foreign import ccall tox_conference_get_type :: Tox -> Word32 -> CErr ErrConferenceGetType -> IO (CEnum ConferenceType)
-toxConferenceGetType :: Tox -> Word32 -> IO (Either ErrConferenceGetType ConferenceType)
+toxConferenceGetType :: ToxPtr -> Word32 -> IO (Either ErrConferenceGetType ConferenceType)
 toxConferenceGetType tox gn = callErrFun (tox_conference_get_type tox gn >=> (return . fromCEnum))
 
 
@@ -1506,32 +1038,6 @@ toxConferenceGetType tox gn = callErrFun (tox_conference_get_type tox gn >=> (re
 -- :: Low-level custom packet sending and receiving
 --
 --------------------------------------------------------------------------------
-
-
-data ErrFriendCustomPacket
-    = ErrFriendCustomPacketNull
-      -- One of the arguments to the function was 'nullPtr' when it was not
-      -- expected.
-
-    | ErrFriendCustomPacketFriendNotFound
-      -- The friend number did not designate a valid friend.
-
-    | ErrFriendCustomPacketFriendNotConnected
-      -- This client is currently not connected to the friend.
-
-    | ErrFriendCustomPacketInvalid
-      -- The first byte of data was not in the specified range for the packet
-      -- type. This range is 200-254 for lossy, and 160-191 for lossless packets.
-
-    | ErrFriendCustomPacketEmpty
-      -- Attempted to send an empty packet.
-
-    | ErrFriendCustomPacketTooLong
-      -- Packet data length exceeded 'tox_max_custom_packet_size'.
-
-    | ErrFriendCustomPacketSendq
-      -- Packet queue is full.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 
 -- | Send a custom lossy packet to a friend.
@@ -1552,8 +1058,7 @@ data ErrFriendCustomPacket
 -- @param length The length of the packet data byte array.
 --
 -- @return true on success.
-foreign import ccall tox_friend_send_lossy_packet :: Tox -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool
-toxFriendLossyPacket :: Tox -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+toxFriendLossyPacket :: ToxPtr -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
 toxFriendLossyPacket tox fn d =
     BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
         callErrFun $ tox_friend_send_lossy_packet tox fn dataPtr (fromIntegral dataLen)
@@ -1572,8 +1077,7 @@ toxFriendLossyPacket tox fn d =
 -- @param length The length of the packet data byte array.
 --
 -- @return true on success.
-foreign import ccall tox_friend_send_lossless_packet :: Tox -> Word32 -> CString -> CSize -> CErr ErrFriendCustomPacket -> IO Bool
-toxFriendLosslessPacket :: Tox -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
+toxFriendLosslessPacket :: ToxPtr -> Word32 -> BS.ByteString -> IO (Either ErrFriendCustomPacket Bool)
 toxFriendLosslessPacket tox fn d =
     BS.useAsCStringLen d $ \(dataPtr, dataLen) ->
         callErrFun $ tox_friend_send_lossless_packet tox fn dataPtr (fromIntegral dataLen)
@@ -1597,28 +1101,18 @@ toxFriendLosslessPacket tox fn d =
 --
 -- @param dht_id A memory region of at least 'tox_public_key_size' bytes. If
 --   this parameter is 'nullPtr', this function has no effect.
-foreign import ccall tox_self_get_dht_id :: Tox -> CString -> IO ()
-
-toxSelfGetDhtId :: Tox -> IO BS.ByteString
+toxSelfGetDhtId :: ToxPtr -> IO BS.ByteString
 toxSelfGetDhtId tox =
     let idLen = fromIntegral tox_public_key_size in
     allocaArray idLen $ \idPtr -> do
         tox_self_get_dht_id tox idPtr
         BS.packCStringLen (idPtr, idLen)
 
-data ErrGetPort
-    = ErrGetPortNotBound
-      -- The instance was not bound to any port.
-    deriving (Eq, Ord, Enum, Bounded, Read, Show)
-
-
 -- | Return the UDP port this Tox instance is bound to.
-foreign import ccall tox_self_get_udp_port :: Tox -> CErr ErrGetPort -> IO Word16
-toxSelfGetUdpPort :: Tox -> IO (Either ErrGetPort Word16)
+toxSelfGetUdpPort :: ToxPtr -> IO (Either ErrGetPort Word16)
 toxSelfGetUdpPort tox = callErrFun $ tox_self_get_udp_port tox
 
 -- | Return the TCP port this Tox instance is bound to. This is only relevant if
 -- the instance is acting as a TCP relay.
-foreign import ccall tox_self_get_tcp_port :: Tox -> CErr ErrGetPort -> IO Word16
-toxSelfGetTcpPort :: Tox -> IO (Either ErrGetPort Word16)
-toxSelfGetTcpPort tox = callErrFun $ tox_self_get_udp_port tox
+toxSelfGetTcpPort :: ToxPtr -> IO (Either ErrGetPort Word16)
+toxSelfGetTcpPort tox = callErrFun $ tox_self_get_tcp_port tox
