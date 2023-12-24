@@ -23,6 +23,7 @@ haskell_library(
         ":api_tox_tox",
     ],
     src_strip_prefix = "src",
+    tags = ["no-cross"],
     version = "0.2.12",
     visibility = ["//visibility:public"],
     deps = [
