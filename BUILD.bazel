@@ -10,6 +10,7 @@ project()
     outs = ["src/FFI/%s.hs" % "/".join([mod.capitalize() for mod in src[:-2].split("/")])],
     cmd = "$(location //hs-apigen/tools:apigen) -hs $< > $@",
     exec_tools = ["//hs-apigen/tools:apigen"],
+    tags = ["no-cross"],
 ) for src in [
     "tox/tox.h",
 ]]
