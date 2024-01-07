@@ -4,24 +4,24 @@ load("//tools/project:build_defs.bzl", "project")
 
 project(license = "gpl3-https")
 
-[genrule(
-    name = "api_" + src[:-2].replace("/", "_"),
-    srcs = ["//c-toxcore:" + src],
-    outs = ["src/FFI/%s.hs" % "/".join([mod.capitalize() for mod in src[:-2].split("/")])],
-    cmd = "$(location //hs-apigen/tools:apigen) -hs $< > $@",
-    exec_tools = ["//hs-apigen/tools:apigen"],
-    tags = ["no-cross"],
-) for src in [
-    "tox/tox.h",
-]]
+#[genrule(
+#    name = "api_" + src[:-2].replace("/", "_"),
+#     srcs = ["//c-toxcore:" + src],
+#     outs = ["src/FFI/%s.hs" % "/".join([mod.capitalize() for mod in src[:-2].split("/")])],
+#     cmd = "$(location //hs-apigen/tools:apigen) -hs $< > $@",
+#     exec_tools = ["//hs-apigen/tools:apigen"],
+#     tags = ["no-cross"],
+# ) for src in [
+#     "tox/tox.h",
+# ]]
 
 haskell_library(
     name = "hs-toxcore-c",
     srcs = glob(
         ["src/**/*.*hs"],
-        exclude = ["src/FFI/**"],
+        #exclude = ["src/FFI/**"],
     ) + [
-        ":api_tox_tox",
+        #":api_tox_tox",
     ],
     src_strip_prefix = "src",
     tags = ["no-cross"],
