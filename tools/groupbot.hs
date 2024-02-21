@@ -1,13 +1,14 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE LambdaCase     #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE StrictData     #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StrictData        #-}
 module Main (main) where
 
 import           Control.Concurrent       (threadDelay)
 import           Control.Exception        (AsyncException (UserInterrupt),
                                            catch, throwIO)
-import           Control.Monad            (foldM)
+import           Control.Monad            (foldM, void, when)
 import qualified Data.ByteString.Base16   as Base16
 import qualified Data.ByteString.Char8    as BS
 import           Data.String              (fromString)
@@ -27,7 +28,7 @@ Right bootstrapKey =
         "3F0A45A268367C1BEA652F258C85F4A66DA76BCAA667A49E770BCC4917AB6A25"
 Right masterKey =
     Base16.decode . fromString $
-        "040F75B5C8995F9525F9A8692A6C355286BBD3CF248C984560733421274F0365"
+        "13117C65771C5A05409F532A7809D238E38E94312C870FE7970C5B65B1215E20"
 
 isMasterKey :: BS.ByteString -> Bool
 isMasterKey = (masterKey ==)
@@ -40,6 +41,15 @@ bootstrapHost = "tox.initramfs.io"
 
 savedataFilename :: String
 savedataFilename = "groupbot.tox"
+
+doInvite :: Bool
+doInvite = False
+
+save :: C.ToxPtr -> IO ()
+save tox = do
+    savedSavedata <- C.toxGetSavedata tox
+    BS.writeFile savedataFilename savedSavedata
+
 
 options :: BS.ByteString -> C.Options
 options savedata = C.Options
@@ -81,13 +91,14 @@ handleEvent tox ud@(UserData gn) = \case
         putStrLn $ (BS.unpack . Base16.encode) pk
         Text.putStrLn $ Text.decodeUtf8 message
         print fn
+        save tox
         return ud
 
     FriendConnectionStatus friendNumber status -> do
         putStrLn "FriendConnectionStatusCb"
         print friendNumber
         print status
-        if status /= C.ConnectionNone
+        if doInvite && status /= C.ConnectionNone
             then do
                 putStrLn "Inviting!"
                 _ <- C.toxConferenceInvite tox friendNumber gn
@@ -101,7 +112,7 @@ handleEvent tox ud@(UserData gn) = \case
         print friendNumber
         print messageType
         Text.putStrLn $ Text.decodeUtf8 message
-        _ <- C.toxFriendSendMessage tox friendNumber messageType message
+        _ <- C.toxFriendSendMessage tox friendNumber messageType (message <> "\0" <> message)
         return ud
 
     ConferenceInvite{ friendNumber, cookie } -> do
@@ -112,10 +123,18 @@ handleEvent tox ud@(UserData gn) = \case
             then do
                 putStrLn "Joining!"
                 newGn <- getRight =<< C.toxConferenceJoin tox friendNumber cookie
+                save tox
                 return $ UserData newGn
             else do
                 putStrLn "Not master!"
                 return ud
+
+    ConferenceMessage{ conferenceNumber, peerNumber, message, messageType } -> do
+        when (peerNumber /= 0 && botName `BS.isPrefixOf` message) $ do
+            putStrLn "ConferenceMessage"
+            print message
+            void $ C.toxConferenceSendMessage tox conferenceNumber messageType (message <> "\0" <> message)
+        return ud
 
     _ -> return ud
 
@@ -142,8 +161,9 @@ main = do
         _ <- C.toxSelfSetName tox botName
         gn <- getRight =<< C.toxConferenceNew tox
         catch (loop tox (UserData gn)) $ \case
-            e@UserInterrupt -> throwIO e
+            e@UserInterrupt -> do
+                save tox
+                throwIO e
             _ -> do
-                savedSavedata <- C.toxGetSavedata tox
-                BS.writeFile savedataFilename savedSavedata
+                save tox
                 exitSuccess
