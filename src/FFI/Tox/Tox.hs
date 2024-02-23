@@ -791,58 +791,58 @@ instance Arbitrary GroupJoinFail where arbitrary = arbitraryBoundedEnum
 type GroupJoinFailCb = ToxPtr -> Word32 -> CEnum GroupJoinFail -> Ptr () -> IO ()
 foreign import ccall "wrapper" wrapGroupJoinFailCb :: GroupJoinFailCb -> IO (FunPtr GroupJoinFailCb)
 foreign import ccall tox_callback_group_join_fail :: ToxPtr -> FunPtr GroupJoinFailCb -> IO ()
-data ErrGroupFounderSetPassword
-    = ErrGroupFounderSetPasswordGroupNotFound
-    | ErrGroupFounderSetPasswordPermissions
-    | ErrGroupFounderSetPasswordTooLong
-    | ErrGroupFounderSetPasswordFailSend
-    | ErrGroupFounderSetPasswordMalloc
-    | ErrGroupFounderSetPasswordDisconnected
+data ErrGroupSetPassword
+    = ErrGroupSetPasswordGroupNotFound
+    | ErrGroupSetPasswordPermissions
+    | ErrGroupSetPasswordTooLong
+    | ErrGroupSetPasswordFailSend
+    | ErrGroupSetPasswordMalloc
+    | ErrGroupSetPasswordDisconnected
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupFounderSetPassword
-instance Arbitrary ErrGroupFounderSetPassword where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_founder_set_password :: ToxPtr -> Word32 -> CString -> CSize -> CErr ErrGroupFounderSetPassword -> IO Bool
-data ErrGroupFounderSetTopicLock
-    = ErrGroupFounderSetTopicLockGroupNotFound
-    | ErrGroupFounderSetTopicLockInvalid
-    | ErrGroupFounderSetTopicLockPermissions
-    | ErrGroupFounderSetTopicLockFailSet
-    | ErrGroupFounderSetTopicLockFailSend
-    | ErrGroupFounderSetTopicLockDisconnected
+instance MessagePack ErrGroupSetPassword
+instance Arbitrary ErrGroupSetPassword where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_set_password :: ToxPtr -> Word32 -> CString -> CSize -> CErr ErrGroupSetPassword -> IO Bool
+data ErrGroupSetTopicLock
+    = ErrGroupSetTopicLockGroupNotFound
+    | ErrGroupSetTopicLockInvalid
+    | ErrGroupSetTopicLockPermissions
+    | ErrGroupSetTopicLockFailSet
+    | ErrGroupSetTopicLockFailSend
+    | ErrGroupSetTopicLockDisconnected
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupFounderSetTopicLock
-instance Arbitrary ErrGroupFounderSetTopicLock where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_founder_set_topic_lock :: ToxPtr -> Word32 -> CEnum GroupTopicLock -> CErr ErrGroupFounderSetTopicLock -> IO Bool
-data ErrGroupFounderSetVoiceState
-    = ErrGroupFounderSetVoiceStateGroupNotFound
-    | ErrGroupFounderSetVoiceStatePermissions
-    | ErrGroupFounderSetVoiceStateFailSet
-    | ErrGroupFounderSetVoiceStateFailSend
-    | ErrGroupFounderSetVoiceStateDisconnected
+instance MessagePack ErrGroupSetTopicLock
+instance Arbitrary ErrGroupSetTopicLock where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_set_topic_lock :: ToxPtr -> Word32 -> CEnum GroupTopicLock -> CErr ErrGroupSetTopicLock -> IO Bool
+data ErrGroupSetVoiceState
+    = ErrGroupSetVoiceStateGroupNotFound
+    | ErrGroupSetVoiceStatePermissions
+    | ErrGroupSetVoiceStateFailSet
+    | ErrGroupSetVoiceStateFailSend
+    | ErrGroupSetVoiceStateDisconnected
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupFounderSetVoiceState
-instance Arbitrary ErrGroupFounderSetVoiceState where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_founder_set_voice_state :: ToxPtr -> Word32 -> CEnum GroupVoiceState -> CErr ErrGroupFounderSetVoiceState -> IO Bool
-data ErrGroupFounderSetPrivacyState
-    = ErrGroupFounderSetPrivacyStateGroupNotFound
-    | ErrGroupFounderSetPrivacyStatePermissions
-    | ErrGroupFounderSetPrivacyStateFailSet
-    | ErrGroupFounderSetPrivacyStateFailSend
-    | ErrGroupFounderSetPrivacyStateDisconnected
+instance MessagePack ErrGroupSetVoiceState
+instance Arbitrary ErrGroupSetVoiceState where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_set_voice_state :: ToxPtr -> Word32 -> CEnum GroupVoiceState -> CErr ErrGroupSetVoiceState -> IO Bool
+data ErrGroupSetPrivacyState
+    = ErrGroupSetPrivacyStateGroupNotFound
+    | ErrGroupSetPrivacyStatePermissions
+    | ErrGroupSetPrivacyStateFailSet
+    | ErrGroupSetPrivacyStateFailSend
+    | ErrGroupSetPrivacyStateDisconnected
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupFounderSetPrivacyState
-instance Arbitrary ErrGroupFounderSetPrivacyState where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_founder_set_privacy_state :: ToxPtr -> Word32 -> CEnum GroupPrivacyState -> CErr ErrGroupFounderSetPrivacyState -> IO Bool
-data ErrGroupFounderSetPeerLimit
-    = ErrGroupFounderSetPeerLimitGroupNotFound
-    | ErrGroupFounderSetPeerLimitPermissions
-    | ErrGroupFounderSetPeerLimitFailSet
-    | ErrGroupFounderSetPeerLimitFailSend
-    | ErrGroupFounderSetPeerLimitDisconnected
+instance MessagePack ErrGroupSetPrivacyState
+instance Arbitrary ErrGroupSetPrivacyState where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_set_privacy_state :: ToxPtr -> Word32 -> CEnum GroupPrivacyState -> CErr ErrGroupSetPrivacyState -> IO Bool
+data ErrGroupSetPeerLimit
+    = ErrGroupSetPeerLimitGroupNotFound
+    | ErrGroupSetPeerLimitPermissions
+    | ErrGroupSetPeerLimitFailSet
+    | ErrGroupSetPeerLimitFailSend
+    | ErrGroupSetPeerLimitDisconnected
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupFounderSetPeerLimit
-instance Arbitrary ErrGroupFounderSetPeerLimit where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_founder_set_peer_limit :: ToxPtr -> Word32 -> Word16 -> CErr ErrGroupFounderSetPeerLimit -> IO Bool
+instance MessagePack ErrGroupSetPeerLimit
+instance Arbitrary ErrGroupSetPeerLimit where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_set_peer_limit :: ToxPtr -> Word32 -> Word16 -> CErr ErrGroupSetPeerLimit -> IO Bool
 data ErrGroupSetIgnore
     = ErrGroupSetIgnoreGroupNotFound
     | ErrGroupSetIgnorePeerNotFound
@@ -851,28 +851,28 @@ data ErrGroupSetIgnore
 instance MessagePack ErrGroupSetIgnore
 instance Arbitrary ErrGroupSetIgnore where arbitrary = arbitraryBoundedEnum
 foreign import ccall tox_group_set_ignore :: ToxPtr -> Word32 -> Word32 -> Bool -> CErr ErrGroupSetIgnore -> IO Bool
-data ErrGroupModSetRole
-    = ErrGroupModSetRoleGroupNotFound
-    | ErrGroupModSetRolePeerNotFound
-    | ErrGroupModSetRolePermissions
-    | ErrGroupModSetRoleAssignment
-    | ErrGroupModSetRoleFailAction
-    | ErrGroupModSetRoleSelf
+data ErrGroupSetRole
+    = ErrGroupSetRoleGroupNotFound
+    | ErrGroupSetRolePeerNotFound
+    | ErrGroupSetRolePermissions
+    | ErrGroupSetRoleAssignment
+    | ErrGroupSetRoleFailAction
+    | ErrGroupSetRoleSelf
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupModSetRole
-instance Arbitrary ErrGroupModSetRole where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_mod_set_role :: ToxPtr -> Word32 -> Word32 -> CEnum GroupRole -> CErr ErrGroupModSetRole -> IO Bool
-data ErrGroupModKickPeer
-    = ErrGroupModKickPeerGroupNotFound
-    | ErrGroupModKickPeerPeerNotFound
-    | ErrGroupModKickPeerPermissions
-    | ErrGroupModKickPeerFailAction
-    | ErrGroupModKickPeerFailSend
-    | ErrGroupModKickPeerSelf
+instance MessagePack ErrGroupSetRole
+instance Arbitrary ErrGroupSetRole where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_set_role :: ToxPtr -> Word32 -> Word32 -> CEnum GroupRole -> CErr ErrGroupSetRole -> IO Bool
+data ErrGroupKickPeer
+    = ErrGroupKickPeerGroupNotFound
+    | ErrGroupKickPeerPeerNotFound
+    | ErrGroupKickPeerPermissions
+    | ErrGroupKickPeerFailAction
+    | ErrGroupKickPeerFailSend
+    | ErrGroupKickPeerSelf
     deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic)
-instance MessagePack ErrGroupModKickPeer
-instance Arbitrary ErrGroupModKickPeer where arbitrary = arbitraryBoundedEnum
-foreign import ccall tox_group_mod_kick_peer :: ToxPtr -> Word32 -> Word32 -> CErr ErrGroupModKickPeer -> IO Bool
+instance MessagePack ErrGroupKickPeer
+instance Arbitrary ErrGroupKickPeer where arbitrary = arbitraryBoundedEnum
+foreign import ccall tox_group_kick_peer :: ToxPtr -> Word32 -> Word32 -> CErr ErrGroupKickPeer -> IO Bool
 data GroupModEvent
     = GroupModEventKick
     | GroupModEventObserver
