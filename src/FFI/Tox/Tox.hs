@@ -71,8 +71,6 @@ instance MessagePack LogLevel
 instance Arbitrary LogLevel where arbitrary = arbitraryBoundedEnum
 type LogCb = ToxPtr -> CEnum LogLevel -> CString -> Word32 -> CString -> CString -> Ptr () -> IO ()
 foreign import ccall "wrapper" wrapLogCb :: LogCb -> IO (FunPtr LogCb)
-data SystemStruct
-type SystemPtr = Ptr SystemStruct
 data OptionsStruct
 type OptionsPtr = Ptr OptionsStruct
 foreign import ccall tox_options_get_ipv6_enabled :: OptionsPtr -> IO Bool
@@ -109,8 +107,6 @@ foreign import ccall tox_options_get_log_user_data :: OptionsPtr -> IO (Ptr ())
 foreign import ccall tox_options_set_log_user_data :: OptionsPtr -> Ptr () -> IO ()
 foreign import ccall tox_options_get_experimental_thread_safety :: OptionsPtr -> IO Bool
 foreign import ccall tox_options_set_experimental_thread_safety :: OptionsPtr -> Bool -> IO ()
-foreign import ccall tox_options_get_operating_system :: OptionsPtr -> IO SystemPtr
-foreign import ccall tox_options_set_operating_system :: OptionsPtr -> SystemPtr -> IO ()
 foreign import ccall tox_options_default :: OptionsPtr -> IO ()
 data ErrOptionsNew
     = ErrOptionsNewMalloc
@@ -134,7 +130,6 @@ instance MessagePack ErrNew
 instance Arbitrary ErrNew where arbitrary = arbitraryBoundedEnum
 foreign import ccall tox_new :: OptionsPtr -> CErr ErrNew -> IO ToxPtr
 foreign import ccall tox_kill :: ToxPtr -> IO ()
-foreign import ccall tox_get_system :: ToxPtr -> IO SystemPtr
 foreign import ccall tox_get_savedata_size :: ToxPtr -> IO CSize
 foreign import ccall tox_get_savedata :: ToxPtr -> CString -> IO ()
 data ErrBootstrap
