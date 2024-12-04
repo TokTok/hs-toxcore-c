@@ -9,7 +9,7 @@ project(license = "gpl3-https")
 #     srcs = ["//c-toxcore:" + src],
 #     outs = ["src/FFI/%s.hs" % "/".join([mod.capitalize() for mod in src[:-2].split("/")])],
 #     cmd = "$(location //hs-apigen/tools:apigen) -hs $< > $@",
-#     exec_tools = ["//hs-apigen/tools:apigen"],
+#     tools = ["//hs-apigen/tools:apigen"],
 #     tags = ["no-cross"],
 # ) for src in [
 #     "tox/tox.h",
@@ -25,7 +25,7 @@ haskell_library(
     ],
     src_strip_prefix = "src",
     tags = ["no-cross"],
-    version = "0.2.12",
+    version = "0.2.19",
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",

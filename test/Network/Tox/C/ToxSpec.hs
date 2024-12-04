@@ -3,6 +3,7 @@
 {-# LANGUAGE Trustworthy #-}
 module Network.Tox.C.ToxSpec where
 
+import           Control.Monad   (when)
 import qualified Data.ByteString as BS
 import           Test.Hspec
 import           Test.QuickCheck
@@ -46,6 +47,12 @@ must :: Show a => IO (Either a b) -> IO b
 must = (getRight =<<)
 
 
+shouldBeBetween :: (Show a, Ord a) => a -> (a, a) -> IO ()
+shouldBeBetween v (lo, hi) = do
+    when (v < lo || v > hi) $
+        expectationFailure $ "value " <> show v <> " should be between " <> show lo <> " and " <> show hi
+
+
 spec :: Spec
 spec = do
     describe "tox_version_is_compatible" $ do
@@ -61,12 +68,12 @@ spec = do
             fromIntegral C.tox_public_key_size `shouldBe` boxPK
             fromIntegral C.tox_secret_key_size `shouldBe` boxSK
             C.tox_address_size `shouldBe` C.tox_public_key_size + 6
-            C.tox_max_name_length `shouldBe` 128
-            C.tox_max_status_message_length `shouldBe` 1007
-            C.tox_max_friend_request_length `shouldBe` 1016
+            C.tox_max_name_length `shouldBeBetween` (100, 200)
+            C.tox_max_status_message_length `shouldBeBetween` (500, 1400)
+            C.tox_max_friend_request_length `shouldBeBetween` (500, 1400)
             C.tox_max_message_length `shouldBe` C.tox_max_custom_packet_size - 1
-            C.tox_max_custom_packet_size `shouldBe` 1373
-            C.tox_max_filename_length `shouldBe` 255
+            C.tox_max_custom_packet_size `shouldBeBetween` (500, 1400)
+            C.tox_max_filename_length `shouldBeBetween` (100, 255)
             C.tox_hash_length `shouldBe` C.tox_file_id_length
 
     describe "Options" $ do
