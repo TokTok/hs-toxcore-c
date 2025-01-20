@@ -3,7 +3,10 @@ load("@rules_haskell//haskell:defs.bzl", "haskell_binary")
 haskell_binary(
     name = "groupbot",
     srcs = ["groupbot.hs"],
-    tags = ["no-cross"],
+    tags = [
+        "haskell",
+        "no-cross",
+    ],
     visibility = ["//tools/haskell:__pkg__"],
     deps = [
         "//hs-toxcore-c",
