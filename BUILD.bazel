@@ -28,7 +28,7 @@ haskell_library(
         "haskell",
         "no-cross",
     ],
-    version = "0.2.19",
+    version = "0.2.20",
     visibility = ["//visibility:public"],
     deps = [
         "//c-toxcore",

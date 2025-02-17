@@ -1,6 +1,6 @@
 name:          toxcore-c
 synopsis:      Haskell bindings to the C reference implementation of Tox
-version:       0.2.19
+version:       0.2.20
 cabal-version: >=1.10
 license:       GPL-3
 license-file:  LICENSE
