@@ -5,7 +5,12 @@ set -ex
 sudo apt-get install libopus-dev libsodium-dev libvpx-dev
 
 git clone --recurse-submodules --depth=1 https://github.com/TokTok/c-toxcore
-cmake -Bc-toxcore/_build -Hc-toxcore -DBOOTSTRAP_DAEMON=OFF -DCMAKE_INSTALL_PREFIX:PATH="/usr"
-cmake --build c-toxcore/_build --parallel "$(nproc)"
-sudo cmake --build c-toxcore/_build --parallel "$(nproc)" --target install
+cmake \
+  -B c-toxcore/_build \
+  -D BOOTSTRAP_DAEMON=OFF \
+  -D CMAKE_INSTALL_PREFIX:PATH="/usr" \
+  -G Ninja \
+  c-toxcore
+cmake --build c-toxcore/_build
+sudo cmake --install c-toxcore/_build
 rm -rf c-toxcore
