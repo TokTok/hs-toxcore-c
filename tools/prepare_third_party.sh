@@ -2,7 +2,7 @@
 
 set -ex
 
-sudo apt-get install libopus-dev libsodium-dev libvpx-dev
+sudo apt-get install ninja-build libopus-dev libsodium-dev libvpx-dev
 
 git clone --recurse-submodules --depth=1 https://github.com/TokTok/c-toxcore
 cmake \
