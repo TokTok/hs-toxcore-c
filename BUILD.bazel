@@ -1,28 +1,26 @@
 load("@rules_haskell//haskell:defs.bzl", "haskell_library")
+load("//third_party/haskell/c2hs:build_defs.bzl", "c2hs_library")
 load("//third_party/haskell/hspec-discover:build_defs.bzl", "hspec_test")
 load("//tools/project:build_defs.bzl", "project")
 
 project(license = "gpl3-https")
 
-#[genrule(
-#    name = "api_" + src[:-2].replace("/", "_"),
-#     srcs = ["//c-toxcore:" + src],
-#     outs = ["src/FFI/%s.hs" % "/".join([mod.capitalize() for mod in src[:-2].split("/")])],
-#     cmd = "$(location //hs-apigen/tools:apigen) -hs $< > $@",
-#     tools = ["//hs-apigen/tools:apigen"],
-#     tags = ["no-cross", "haskell"],
-# ) for src in [
-#     "tox/tox.h",
-# ]]
+c2hs_library(
+    name = "tox_raw",
+    src = "src/FFI/Tox/Raw.chs",
+    tags = ["no-cross"],
+    deps = [
+        "//c-toxcore",
+    ],
+)
 
 haskell_library(
     name = "hs-toxcore-c",
     srcs = glob(
         ["src/**/*.*hs"],
-        #exclude = ["src/FFI/**"],
-    ) + [
-        #":api_tox_tox",
-    ],
+        exclude = ["src/**/*.chs"],
+    ) + [":tox_raw"],
+    linkstatic = True,
     src_strip_prefix = "src",
     tags = [
         "haskell",
@@ -31,6 +29,7 @@ haskell_library(
     version = "0.2.20",
     visibility = ["//visibility:public"],
     deps = [
+        ":tox_raw",
         "//c-toxcore",
         "//hs-msgpack-binary",
         "//third_party/haskell:QuickCheck",
@@ -43,7 +42,9 @@ haskell_library(
 
 hspec_test(
     name = "testsuite",
-    timeout = "short",
+    timeout = "moderate",
+    ghcopts = ["-Wno-missed-extra-shared-lib"],
+    linkstatic = True,
     deps = [
         ":hs-toxcore-c",
         "//hs-msgpack-binary",

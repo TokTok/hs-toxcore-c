@@ -32,5 +32,5 @@ callErrFun f = alloca $ \errPtr -> do
   res <- f errPtr
   err <- unCEnum <$> peek errPtr
   return $ if err > 0
-    then Left . toEnum . fromIntegral $ err - 1
+    then Left . toEnum . fromIntegral $ err
     else Right res
